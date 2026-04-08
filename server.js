@@ -19,14 +19,14 @@ app.use(cors())
 // store sessions
 const sessions = {}
 const sessionStatus = {}
-
+const loggingOut = {}
 let templates = {}  // { keyword: templateObject }
 
 // ----------------------
 // CREATE SESSION
 // ----------------------
 
-async function startSession(phone) {
+async function startSession1(phone) {
 
   const { state, saveCreds } = await useMultiFileAuthState(`sessions/${phone}`)
   const { version } = await fetchLatestBaileysVersion()
@@ -85,6 +85,96 @@ async function startSession(phone) {
 
 }
 
+async function startSession(phone) {
+  if (!sessionFolderExists(phone)) {
+    console.log(`⚠ No session folder for ${phone}, skipping reconnect`)
+    return
+  }
+
+  if (loggingOut[phone]) {
+    console.log(`🚫 Skipping reconnect — logout in progress for ${phone}`)
+    return
+  }
+
+  const { state, saveCreds } = await useMultiFileAuthState(`sessions/${phone}`)
+  const { version } = await fetchLatestBaileysVersion()
+
+  const sock = makeWASocket({
+    version,
+    auth: state,
+    browser: Browsers.windows("Chrome"),
+    printQRInTerminal: false
+  })
+
+  sessions[phone] = sock
+  sessionStatus[phone] = "connecting"
+
+  sock.ev.on("creds.update", saveCreds)
+
+  sock.ev.on("connection.update", async (update) => {
+    const { connection, lastDisconnect } = update
+
+    if (connection === "open") {
+      sessionStatus[phone] = "connected"
+      console.log(`✅ Connected ${phone}`)
+    }
+
+    if (connection === "close") {
+      sessionStatus[phone] = "disconnected"
+      const reason = lastDisconnect?.error?.output?.statusCode
+
+      // ✅ Don't reconnect if logout is in progress
+      if (loggingOut[phone]) {
+        console.log(`🚫 Reconnect blocked — logout in progress: ${phone}`)
+        return
+      }
+
+      if (reason === DisconnectReason.loggedOut) {
+        console.log(`🚪 Logged out: ${phone}`)
+        delete sessions[phone]
+        delete sessionStatus[phone]
+        deleteSession(phone)
+      } else {
+        console.log(`🔁 Reconnecting ${phone} in 5s...`)
+        setTimeout(() => startSession(phone), 5000)
+      }
+    }
+  })
+}
+
+
+function sessionFolderExists(phone) {
+  return fs.existsSync(path.join(__dirname, "sessions", phone, "creds.json"))
+}
+
+async function getOrRestoreSession(phone) {
+  // already connected
+  if (sessions[phone] && sessions[phone].ws?.readyState === 1) {
+    return sessions[phone]
+  }
+
+  // session folder exists → restore it
+  if (sessionFolderExists(phone)) {
+    console.log(`🔄 Auto-restoring session: ${phone}`)
+    await startSession(phone)
+
+    // wait up to 10s for connection
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Restore timeout")), 10000)
+      const interval = setInterval(() => {
+        if (sessionStatus[phone] === "connected") {
+          clearTimeout(timeout)
+          clearInterval(interval)
+          resolve()
+        }
+      }, 500)
+    })
+
+    return sessions[phone]
+  }
+
+  return null  // no session at all
+}
 
 async function connectWhatsApp(phone) {
 
@@ -130,6 +220,10 @@ async function connectWhatsApp(phone) {
 
         delete sessions[phone]
         delete sessionStatus[phone]
+        //await new Promise(r => setTimeout(r, 500));
+
+        // Delete session folder
+        deleteSession(phone);
 
       } else {
 
@@ -243,110 +337,6 @@ function registerBotEvents(phone) {
 // CONNECT API
 // ----------------------
 
-
-app.post("/connect22", async (req, res) => {
-
-  try {
-
-    const { phone } = req.body
-
-    if (!phone) {
-      return res.status(400).json({
-        error: "phone required"
-      })
-    }
-
-    // 🔴 If session exists → logout + delete
-    if (sessions[phone]) {
-
-      try {
-        await sessions[phone].logout()
-      } catch (e) {}
-
-      delete sessions[phone]
-      delete sessionStatus[phone]
-
-      deleteSession(phone)
-
-      console.log("♻️ Restarting session", phone)
-
-    }
-
-    const result = await connectWhatsApp(phone)
-
-    res.json(result)
-
-  } catch (err) {
-
-    res.status(500).json({
-      error: err.message
-    })
-
-  }
-
-})
-
-
-app.post("/connectWW", async (req, res) => {
-
-  try {
-
-    const { phone } = req.body
-
-    if (!phone) {
-      return res.status(400).json({
-        error: "phone required"
-      })
-    }
-
-    // if session exists -> logout + clear
-    if (sessions[phone]) {
-
-      console.log(`♻ Resetting existing session: ${phone}`)
-
-      try {
-
-        const sock = sessions[phone]
-
-        // close websocket
-        if (sock?.ws) {
-          sock.ws.close()
-        }
-
-        // logout device
-        await sock.logout()
-
-      } catch (e) {
-        console.log("Logout error:", e.message)
-      }
-
-      // remove from memory
-      delete sessions[phone]
-      delete sessionStatus[phone]
-
-      // delete session folder
-      deleteSession(phone)
-
-    }
-
-    // small delay to avoid race condition
-    await new Promise(r => setTimeout(r, 1000))
-
-    // start fresh login
-    const result = await connectWhatsApp(phone)
-
-    res.json(result)
-
-  } catch (err) {
-
-    res.status(500).json({
-      error: err.message
-    })
-
-  }
-
-})
-
 app.post("/connect", async (req, res) => {
   try {
 
@@ -428,35 +418,7 @@ app.get("/status/:phone", (req, res) => {
 
 })
 
-app.post("/broadcast", async (req, res) => {
-  try {
-    const { from, numbers, message } = req.body;
 
-    if (!from || !numbers || !message)
-      return res.status(400).json({ error: "from, numbers, message are required" });
-
-    const sock = sessions[from];
-    if (!sock || sock.ws.readyState !== 1) {
-      return res.status(400).json({ error: "WhatsApp not connected for this number" });
-    }
-
-    const results = [];
-
-    for (const num of numbers) {
-      try {
-        const jid = num + "@s.whatsapp.net";
-        await sock.sendMessage(jid, { text: message });
-        results.push({ number: num, status: "sent" });
-      } catch (err) {
-        results.push({ number: num, status: "failed", error: err.message });
-      }
-    }
-
-    res.json({ from, message, results });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ----------------------
 // LIST ALL SESSIONS
@@ -476,38 +438,6 @@ app.get("/sessions", (req, res) => {
 // ----------------------
 // SEND TEXT
 // ----------------------
-
-app.post("/send-message1", async (req, res) => {
-
-  try {
-
-    const { phone, to, message } = req.body
-
-    const sock = sessions[phone]
-
-    if (!sock) {
-      return res.status(404).json({
-        error: "session not found"
-      })
-    }
-
-    const jid = to + "@s.whatsapp.net"
-
-    await sock.sendMessage(jid, { text: message })
-
-    res.json({
-      success: true
-    })
-
-  } catch (err) {
-
-    res.status(500).json({
-      error: err.message
-    })
-
-  }
-
-})
 
 app.post("/send-message", async (req, res) => {
 
@@ -766,147 +696,100 @@ app.post("/send-template", async (req, res) => {
 
 
 
-app.post("/logout2", async (req, res) => {
-  try {
-    const { phone } = req.body;
 
-    if (!phone) {
-      return res.status(400).json({ error: "phone required" });
-    }
 
-    const sock = sessions[phone];
-
-    if (!sock) {
-      // If session folder exists, delete it anyway
-      deleteSession(phone);
-      return res.status(404).json({ error: "session not found, folder cleared" });
-    }
-
-    // Ensure socket is connected before calling logout
-    if (!sock.user || sock.ws.readyState !== 1) {
-      console.log("🔄 Socket not active, reconnecting to logout...");
-
-      // Recreate socket
-      const { state, saveCreds } = await useMultiFileAuthState(`sessions/${phone}`);
-      const { version } = await fetchLatestBaileysVersion();
-
-      const tempSock = makeWASocket({
-        version,
-        auth: state,
-        browser: Browsers.windows("Chrome"),
-        printQRInTerminal: false
-      });
-
-      await new Promise((resolve) => {
-        tempSock.ev.on("connection.update", (update) => {
-          if (update.connection === "open") {
-            console.log("✅ Reconnected to WhatsApp for logout");
-            resolve();
-          }
-        });
-      });
-
-      // Replace sock with tempSock for logout
-      sessions[phone] = tempSock;
-    }
-
-    try {
-      // Logout from WhatsApp (unlink device)
-      await sessions[phone].logout();
-      console.log(`✅ WhatsApp unlinked: ${phone}`);
-    } catch (e) {
-      console.log("⚠ Logout failed:", e.message);
-    }
-
-    // Close websocket
-    if (sessions[phone]?.ws) {
-      sessions[phone].ws.close();
-    }
-
-    // Remove memory references
-    delete sessions[phone];
-    delete sessionStatus[phone];
-
-    await new Promise(r => setTimeout(r, 500)); // wait 0.5 sec
-
-    // Delete session folder
-    deleteSession(phone);
-
-    res.json({
-      success: true,
-      message: "WhatsApp unlinked and session cleared"
-    });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// ----------------------
+// LOGOUT
+// ----------------------
 app.post("/logout", async (req, res) => {
   try {
-    const { phone } = req.body;
-    if (!phone) return res.status(400).json({ error: "Phone number required" });
+    const { phone } = req.body
+    if (!phone) return res.status(400).json({ error: "Phone number required" })
 
-    let sock = sessions[phone];
+    // ✅ Set flag FIRST to block any reconnect attempts
+    loggingOut[phone] = true
 
-    // Step 1: If socket exists but inactive, reconnect temporarily
-    if (!sock || sock.ws.readyState !== 1) {
-      console.log("🔄 Socket inactive, creating temp socket for logout...");
+    let sock = sessions[phone]
 
-      const { state, saveCreds } = await useMultiFileAuthState(`sessions/${phone}`);
-      const { version } = await fetchLatestBaileysVersion();
-
-      sock = makeWASocket({
-        version,
-        auth: state,
-        browser: Browsers.windows("Chrome"),
-        printQRInTerminal: false
-      });
-
-      await new Promise((resolve) => {
-        sock.ev.on("connection.update", (update) => {
-          if (update.connection === "open") {
-            console.log("✅ Temp socket connected for logout");
-            resolve();
-          }
-        });
-      });
+    if (!sock) {
+      deleteSession(phone)
+      delete sessionStatus[phone]
+      delete loggingOut[phone]
+      return res.json({ success: true, message: "No active session, folder cleared" })
     }
 
-    // Step 2: Logout from WhatsApp server
+    if (sock.ws?.readyState !== 1) {
+      if (sessionFolderExists(phone)) {
+        console.log("🔄 Socket inactive, reconnecting for logout...")
+        try {
+          const { state, saveCreds } = await useMultiFileAuthState(`sessions/${phone}`)
+          const { version } = await fetchLatestBaileysVersion()
+
+          sock = makeWASocket({
+            version,
+            auth: state,
+            browser: Browsers.windows("Chrome"),
+            printQRInTerminal: false
+          })
+
+          sock.ev.on("creds.update", saveCreds)
+
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("Reconnect timeout")), 15000)
+            sock.ev.on("connection.update", (update) => {
+              if (update.connection === "open") { clearTimeout(timeout); resolve() }
+              if (update.connection === "close") { clearTimeout(timeout); reject(new Error("Closed")) }
+            })
+          })
+
+        } catch (e) {
+          console.log("⚠ Reconnect failed, force clearing:", e.message)
+          delete sessions[phone]
+          delete sessionStatus[phone]
+          delete loggingOut[phone]
+          deleteSession(phone)
+          return res.json({ success: true, message: "Force cleared session" })
+        }
+      } else {
+        delete sessions[phone]
+        delete sessionStatus[phone]
+        delete loggingOut[phone]
+        return res.json({ success: true, message: "Session folder missing, memory cleared" })
+      }
+    }
+
+    // ✅ Now logout
     try {
-      await sock.logout();
-      console.log(`✅ WhatsApp unlinked: ${phone}`);
+      await sock.logout()
+      console.log(`✅ WhatsApp unlinked: ${phone}`)
     } catch (e) {
-      console.log("⚠ Logout failed (maybe session already expired):", e.message);
+      console.log("⚠ Logout error:", e.message)
     }
 
-    // Step 3: Close the WebSocket
-    if (sock.ws) {
-      sock.ws.close();
-      console.log("🔌 Socket closed");
+    try {
+      if (sock.ws) { sock.ws.close(); console.log("🔌 Socket closed") }
+    } catch (e) {
+      console.log("⚠ WS close error:", e.message)
     }
 
-    // Step 4: Clean memory
-    delete sessions[phone];
-    delete sessionStatus[phone];
+    delete sessions[phone]
+    delete sessionStatus[phone]
 
-    // Step 5: Wait a short time to ensure cleanup
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 500))
 
-    // Step 6: Delete session folder
-    deleteSession(phone);
+    deleteSession(phone)
 
-    res.json({
-      success: true,
-      message: "WhatsApp unlinked, socket closed, memory cleared, session folder deleted"
-    });
+    // ✅ Clear flag after everything is done
+    delete loggingOut[phone]
+
+    res.json({ success: true, message: "WhatsApp unlinked and session cleared" })
 
   } catch (err) {
-    console.error("❌ Logout error:", err);
-    res.status(500).json({ error: err.message });
+    delete loggingOut[phone]  // ✅ always clear flag on error
+    console.error("❌ Logout error:", err)
+    res.status(500).json({ error: err.message })
   }
-});
+})
 
 app.post("/force-logout", async (req,res)=>{
 
@@ -919,6 +802,76 @@ app.post("/force-logout", async (req,res)=>{
 
  res.json({success:true})
 
+})
+
+// ----------------------
+// BROADCAST
+// ----------------------
+app.post("/broadcast", async (req, res) => {
+  try {
+    const { from, numbers, message } = req.body
+
+    if (!from || !numbers || !message)
+      return res.status(400).json({ error: "from, numbers, message required" })
+
+    if (!Array.isArray(numbers) || numbers.length === 0)
+      return res.status(400).json({ error: "numbers must be a non-empty array" })
+
+    // ✅ Auto-restore session if not connected
+    let sock = sessions[from]
+
+    if (!sock || sock.ws?.readyState !== 1) {
+      console.log(`🔄 Session not active for ${from}, attempting restore...`)
+
+      if (!sessionFolderExists(from)) {
+        return res.status(400).json({ error: "No session found. Please connect first." })
+      }
+
+      // restore session
+      await startSession(from)
+
+      // wait up to 15s for connection
+      try {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error("Connection timeout")), 15000)
+
+          const interval = setInterval(() => {
+            if (sessionStatus[from] === "connected") {
+              clearTimeout(timeout)
+              clearInterval(interval)
+              resolve()
+            }
+          }, 500)
+        })
+      } catch (e) {
+        return res.status(500).json({ error: "Failed to restore session: " + e.message })
+      }
+
+      sock = sessions[from]
+    }
+
+    console.log(`📤 Broadcasting to ${numbers.length} numbers from ${from}`)
+
+    const results = []
+    for (const num of numbers) {
+      try {
+        const jid = num.replace(/[^0-9]/g, "") + "@s.whatsapp.net"
+        await sock.sendMessage(jid, { text: message })
+        await new Promise(r => setTimeout(r, 1000)) // avoid spam ban
+        results.push({ number: num, status: "sent" })
+        console.log(`✅ Sent to ${num}`)
+      } catch (err) {
+        results.push({ number: num, status: "failed", error: err.message })
+        console.log(`❌ Failed to ${num}:`, err.message)
+      }
+    }
+
+    res.json({ success: true, from, total: numbers.length, results })
+
+  } catch (err) {
+    console.error("❌ Broadcast error:", err)
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // Helper to delete session folder
@@ -942,6 +895,30 @@ function deleteSession(phone) {
 // START SERVER
 // ----------------------
 
+/*
 app.listen(3000, () => {
   console.log("🚀 WhatsApp API running on http://localhost:3000")
+})
+*/
+
+// ----------------------
+// START SERVER + restore sessions
+// ----------------------
+app.listen(3000, async () => {
+  console.log("🚀 WhatsApp API running on http://localhost:3000")
+
+  // Auto-restore existing sessions on server start
+  // ✅ Auto-restore all existing sessions
+    const sessionsDir = path.join(__dirname, "sessions")
+
+    if (fs.existsSync(sessionsDir)) {
+      const phones = fs.readdirSync(sessionsDir)
+
+      for (const phone of phones) {
+        if (sessionFolderExists(phone)) {
+          console.log(`🔄 Restoring session: ${phone}`)
+          await startSession(phone)
+        }
+      }
+    }
 })
