@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const {
   default: makeWASocket,
@@ -25,21 +26,27 @@ const sessionStatus = {};
 const loggingOut = {};
 const templates = {};
 
+// Auth and Analytics storage
+const users = {};
+const stats = {
+  totalMessagesSent: 0,
+  sessionsCount: 0,
+  activeUsers: 0
+};
+const tokens = {};
+
 // ----------------------
 // Helpers
 // ----------------------
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
 /**
- * Common Response Structure
- * @param {object} res - Express response object
- * @param {number} code - HTTP status code
- * @param {string} message - Message to return
- * @param {any} result - Data to return
+ * Standard API Response
  */
 function sendResponse(res, code, message, result = null) {
+  const isSuccess = code >= 200 && code < 300;
   res.status(code).json({
-    status: code >= 200 && code < 300,
+    status: isSuccess,
     code: code,
     message: message,
     result: result
@@ -57,63 +64,314 @@ function sessionExists(phone) {
 function deleteSessionFolder(phone) {
   const folder = sessionFolder(phone);
   if (fs.existsSync(folder)) {
-    fs.rmSync(folder, { recursive: true, force: true });
-    console.log(`🗑 Session folder deleted: ${phone}`);
+    try {
+      fs.rmSync(folder, { recursive: true, force: true });
+    } catch (err) {
+      console.error(`Error deleting session folder ${phone}:`, err.message);
+    }
   }
 }
 
 // ----------------------
-// Start / Restore Session
+// Public Routes
 // ----------------------
+
+// Register API: name, gender optional; number, password mandatory
+app.post("/register", (req, res) => {
+  try {
+    const { name, gender, number, password } = req.body;
+    if (!number || !password) {
+      return sendResponse(res, 400, "Number and password are mandatory");
+    }
+    if (users[number]) {
+      return sendResponse(res, 400, "User already exists");
+    }
+
+    users[number] = {
+      name: name || "User",
+      gender: gender || "Not Specified",
+      password: password
+    };
+    stats.activeUsers = Object.keys(users).length;
+
+    sendResponse(res, 201, "User registered successfully", {
+      number,
+      name: users[number].name,
+      gender: users[number].gender
+    });
+  } catch (err) {
+    sendResponse(res, 500, "Registration failed", err.message);
+  }
+});
+
+// Login API: Returns access token
+app.post("/login", (req, res) => {
+  try {
+    const { number, password } = req.body;
+    if (!number || !password) {
+      return sendResponse(res, 400, "Number and password are required");
+    }
+
+    const user = users[number];
+    if (!user || user.password !== password) {
+      return sendResponse(res, 401, "Invalid number or password");
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(24).toString('hex');
+    tokens[token] = number;
+
+    sendResponse(res, 200, "Login successful", {
+      token,
+      user: { number, name: user.name, gender: user.gender }
+    });
+  } catch (err) {
+    sendResponse(res, 500, "Login failed", err.message);
+  }
+});
+
+// ----------------------
+// Middleware: Authentication
+// ----------------------
+function authenticate(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token || !tokens[token]) {
+    return sendResponse(res, 401, "Unauthorized: Valid access token required");
+  }
+
+  req.userNumber = tokens[token];
+  next();
+}
+
+// All APIs below this point require authentication
+app.use(authenticate);
+
+// ----------------------
+// Protected Dashboard & Analytics API
+// ----------------------
+
+app.get("/dashboard", (req, res) => {
+  try {
+    const dashboardData = {
+      totalMessagesSent: stats.totalMessagesSent,
+      totalUsers: stats.activeUsers,
+      activeSessions: Object.keys(sessions).length,
+      connectedSessions: Object.values(sessionStatus).filter(s => s === "connected").length,
+      sessionsList: Object.keys(sessions).map(phone => ({
+        phone,
+        status: sessionStatus[phone]
+      }))
+    };
+    sendResponse(res, 200, "Dashboard analytics fetched", dashboardData);
+  } catch (err) {
+    sendResponse(res, 500, "Failed to fetch dashboard", err.message);
+  }
+});
+
+// ----------------------
+// Protected WhatsApp Session Management
+// ----------------------
+
+app.post("/connect", async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return sendResponse(res, 400, "Phone number required");
+
+    if (sessions[phone]) {
+      try {
+        await sessions[phone].logout();
+        sessions[phone].ws?.close();
+      } catch (e) {}
+      delete sessions[phone];
+      delete sessionStatus[phone];
+      deleteSessionFolder(phone);
+    }
+
+    await delay(1000);
+    const result = await connectWhatsApp(phone);
+    sendResponse(res, 200, "Connection initiated", result);
+  } catch (err) {
+    sendResponse(res, 500, "Connection failed", err.message);
+  }
+});
+
+app.post("/logout", async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return sendResponse(res, 400, "Phone required");
+
+    loggingOut[phone] = true;
+    if (sessions[phone]) {
+      try {
+        await sessions[phone].logout();
+        sessions[phone].ws?.close();
+      } catch(e) {}
+      delete sessions[phone];
+      delete sessionStatus[phone];
+    }
+    deleteSessionFolder(phone);
+    delete loggingOut[phone];
+
+    sendResponse(res, 200, "Logged out and session cleared");
+  } catch (err) {
+    sendResponse(res, 500, "Logout failed", err.message);
+  }
+});
+
+app.get("/sessions", (req, res) => {
+  try {
+    const list = Object.keys(sessions).map(phone => ({ phone, status: sessionStatus[phone] }));
+    sendResponse(res, 200, "Sessions fetched", list);
+  } catch (err) {
+    sendResponse(res, 500, "Failed to fetch sessions", err.message);
+  }
+});
+
+app.get("/status/:phone", (req, res) => {
+  try {
+    const phone = req.params.phone;
+    sendResponse(res, 200, "Status fetched", { phone, status: sessionStatus[phone] || "not_connected" });
+  } catch (err) {
+    sendResponse(res, 500, "Failed to fetch status", err.message);
+  }
+});
+
+// ----------------------
+// Protected Messaging APIs
+// ----------------------
+
+app.post("/send-message", async (req, res) => {
+  try {
+    const { phone, message, from } = req.body;
+    if (!phone || !message) return sendResponse(res, 400, "phone and message required");
+
+    const senderPhone = from || Object.keys(sessions)[0];
+    const sock = sessions[senderPhone];
+
+    if (!sock || sessionStatus[senderPhone] !== "connected") {
+      return sendResponse(res, 400, `WhatsApp session for ${senderPhone} not connected`);
+    }
+
+    const jid = phone.replace(/\D/g, "") + "@s.whatsapp.net";
+    const result = await sock.sendMessage(jid, { text: message });
+
+    stats.totalMessagesSent++;
+    sendResponse(res, 200, "Message sent successfully", { from: senderPhone, to: phone, messageId: result.key.id });
+  } catch (err) {
+    sendResponse(res, 500, "Failed to send message", err.message);
+  }
+});
+
+app.post("/broadcast", async (req, res) => {
+  try {
+    const { from, numbers, message } = req.body;
+    if (!from || !numbers || !message) return sendResponse(res, 400, "from, numbers, and message required");
+    if (!Array.isArray(numbers)) return sendResponse(res, 400, "numbers must be an array");
+
+    const sock = sessions[from];
+    if (!sock || sessionStatus[from] !== "connected") {
+      return sendResponse(res, 400, `WhatsApp session for ${from} not connected`);
+    }
+
+    const results = [];
+    for (const num of numbers) {
+      try {
+        const jid = num.replace(/\D/g, "") + "@s.whatsapp.net";
+        await sock.sendMessage(jid, { text: message });
+        stats.totalMessagesSent++;
+        results.push({ number: num, status: "sent" });
+        await delay(1000);
+      } catch (err) {
+        results.push({ number: num, status: "failed", error: err.message });
+      }
+    }
+
+    sendResponse(res, 200, "Broadcast processed", { total: numbers.length, results });
+  } catch (err) {
+    sendResponse(res, 500, "Broadcast failed", err.message);
+  }
+});
+
+// ----------------------
+// Protected Template APIs
+// ----------------------
+
+app.post("/template", (req, res) => {
+  try {
+    const { keyword, type, content, buttons, list } = req.body;
+    if (!keyword || !type || !content) return sendResponse(res, 400, "keyword, type, content required");
+    templates[keyword.toLowerCase()] = { type, content, buttons, list };
+    sendResponse(res, 200, "Template saved", templates[keyword.toLowerCase()]);
+  } catch (err) {
+    sendResponse(res, 500, "Failed to save template", err.message);
+  }
+});
+
+app.get("/templates", (req, res) => {
+  try {
+    sendResponse(res, 200, "Templates fetched", templates);
+  } catch (err) {
+    sendResponse(res, 500, "Failed to fetch templates", err.message);
+  }
+});
+
+// ----------------------
+// Core WhatsApp Logic
+// ----------------------
+
 async function startSession(phone) {
   if (!sessionExists(phone)) return null;
 
-  const { state, saveCreds } = await useMultiFileAuthState(sessionFolder(phone));
-  const { version } = await fetchLatestBaileysVersion();
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(sessionFolder(phone));
+    const { version } = await fetchLatestBaileysVersion();
 
-  const sock = makeWASocket({
-    version,
-    auth: state,
-    browser: Browsers.windows("Chrome"),
-    printQRInTerminal: false
-  });
+    const sock = makeWASocket({
+      version,
+      auth: state,
+      browser: Browsers.windows("Chrome"),
+      printQRInTerminal: false
+    });
 
-  sock.ev.on("creds.update", saveCreds);
-
-  sock.ev.on("connection.update", ({ connection, lastDisconnect }) => {
-    if (connection === "open") {
-      sessionStatus[phone] = "connected";
-      console.log(`✅ Connected: ${phone}`);
-    }
-
-    if (connection === "close") {
-      sessionStatus[phone] = "disconnected";
-      const reason = lastDisconnect?.error?.output?.statusCode;
-
-      if (reason === DisconnectReason.loggedOut) {
-        console.log(`🚪 Logged out: ${phone}`);
-        delete sessions[phone];
-        delete sessionStatus[phone];
-        deleteSessionFolder(phone);
-      } else if (!loggingOut[phone]) {
-        console.log(`🔁 Reconnecting ${phone} in 5s...`);
-        setTimeout(() => startSession(phone), 5000);
+    sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("connection.update", ({ connection, lastDisconnect }) => {
+      if (connection === "open") {
+        sessionStatus[phone] = "connected";
+        console.log(`✅ Session restored: ${phone}`);
       }
-    }
-  });
+      if (connection === "close") {
+        sessionStatus[phone] = "disconnected";
+        const reason = lastDisconnect?.error?.output?.statusCode;
+        if (reason === DisconnectReason.loggedOut) {
+          delete sessions[phone];
+          delete sessionStatus[phone];
+          deleteSessionFolder(phone);
+        } else if (!loggingOut[phone]) {
+          console.log(`🔁 Reconnecting ${phone}...`);
+          setTimeout(() => startSession(phone), 5000);
+        }
+      }
+    });
 
-  sessions[phone] = sock;
-  sessionStatus[phone] = "connecting";
-
-  return sock;
+    sessions[phone] = sock;
+    sessionStatus[phone] = "connecting";
+    return sock;
+  } catch (err) {
+    console.error(`Failed to start session ${phone}:`, err.message);
+    return null;
+  }
 }
 
 async function connectWhatsApp(phone) {
-  if (sessions[phone] && sessions[phone].ws?.readyState === 1) {
+  if (sessions[phone] && sessionStatus[phone] === "connected") {
     return { success: true, message: "Already connected" };
   }
 
-  if (!fs.existsSync(sessionFolder(phone))) fs.mkdirSync(sessionFolder(phone), { recursive: true });
+  if (!fs.existsSync(sessionFolder(phone))) {
+    fs.mkdirSync(sessionFolder(phone), { recursive: true });
+  }
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolder(phone));
   const { version } = await fetchLatestBaileysVersion();
@@ -126,24 +384,19 @@ async function connectWhatsApp(phone) {
   });
 
   sock.ev.on("creds.update", saveCreds);
-
   sock.ev.on("connection.update", ({ connection, lastDisconnect }) => {
     if (connection === "open") {
       sessionStatus[phone] = "connected";
-      console.log(`✅ Connected: ${phone}`);
+      console.log(`✅ WhatsApp Connected: ${phone}`);
     }
-
     if (connection === "close") {
       sessionStatus[phone] = "disconnected";
       const reason = lastDisconnect?.error?.output?.statusCode;
-
       if (reason === DisconnectReason.loggedOut) {
-        console.log(`🚪 Logged out: ${phone}`);
         delete sessions[phone];
         delete sessionStatus[phone];
         deleteSessionFolder(phone);
       } else if (!loggingOut[phone]) {
-        console.log(`🔁 Reconnecting ${phone} in 5s...`);
         setTimeout(() => startSession(phone), 5000);
       }
     }
@@ -156,7 +409,6 @@ async function connectWhatsApp(phone) {
 
   if (!sock.authState.creds.registered) {
     const code = await sock.requestPairingCode(phone);
-    console.log(`📱 Pairing Code ${phone}: ${code}`);
     return { success: true, pairingCode: code };
   }
 
@@ -164,215 +416,7 @@ async function connectWhatsApp(phone) {
 }
 
 // ----------------------
-// Broadcast Messages (text + media + template)
-// ----------------------
-async function sendBroadcast({ from, numbers, message, type = "text", mediaUrl, buttons, sections, fileName }) {
-  if (!from || !numbers?.length || !message) throw new Error("from, numbers[], message required");
-
-  let sock = sessions[from];
-  if (!sock || sock.ws?.readyState !== 1) {
-    if (!sessionExists(from)) throw new Error("No session found. Connect first.");
-    sock = await startSession(from);
-
-    const timeout = 15000;
-    const start = Date.now();
-    while (sessionStatus[from] !== "connected") {
-      if (Date.now() - start > timeout) throw new Error("Connection timeout");
-      await delay(500);
-    }
-  }
-
-  const results = [];
-  for (const num of numbers) {
-    try {
-      const jid = num.replace(/\D/g, "") + "@s.whatsapp.net";
-
-      let payload = {};
-      switch (type.toLowerCase()) {
-        case "text":
-          payload = { text: message };
-          break;
-        case "image":
-          if (!mediaUrl) throw new Error("mediaUrl required for image");
-          payload = { image: { url: mediaUrl }, caption: message };
-          break;
-        case "video":
-          if (!mediaUrl) throw new Error("mediaUrl required for video");
-          payload = { video: { url: mediaUrl }, caption: message };
-          break;
-        case "audio":
-          if (!mediaUrl) throw new Error("mediaUrl required for audio");
-          payload = { audio: { url: mediaUrl }, mimetype: "audio/mp4", ptt: true };
-          break;
-        case "document":
-          if (!mediaUrl) throw new Error("mediaUrl required for document");
-          payload = { document: { url: mediaUrl }, fileName: fileName || "file.pdf", mimetype: "application/pdf" };
-          break;
-        case "buttons":
-          if (!buttons?.length) throw new Error("buttons array required for type 'buttons'");
-          payload = {
-            text: message,
-            footer: "Choose option",
-            buttons: buttons.map((b, i) => ({ buttonId: `btn_${i}`, buttonText: { displayText: b }, type: 1 })),
-            headerType: 1
-          };
-          break;
-        case "list":
-          if (!sections?.length) throw new Error("sections array required for type 'list'");
-          payload = { text: message, footer: "Select option", buttonText: "View", sections };
-          break;
-        default:
-          throw new Error("Invalid type");
-      }
-
-      await sock.sendMessage(jid, payload);
-      results.push({ number: num, status: "sent" });
-      await delay(1000); // throttle
-    } catch (err) {
-      results.push({ number: num, status: "failed", error: err.message });
-    }
-  }
-
-  return results;
-}
-
-// ----------------------
-// CONNECT WHATSAPP
-// ----------------------
-app.post("/connect", async (req, res) => {
-  try {
-    const { phone } = req.body;
-    if (!phone) return sendResponse(res, 400, "Phone number required");
-
-    // If session exists → logout + clear (to avoid conflicts)
-    if (sessions[phone]) {
-      const sock = sessions[phone];
-      try { await sock.logout(); } catch (e) {}
-      try { sock.ws?.close(); } catch (e) {}
-      delete sessions[phone];
-      delete sessionStatus[phone];
-      deleteSessionFolder(phone);
-    }
-
-    // Wait briefly to avoid race condition
-    await new Promise(r => setTimeout(r, 1000));
-
-    // Connect WhatsApp
-    const result = await connectWhatsApp(phone);
-
-    sendResponse(res, 200, "Connection initiated", result);
-  } catch (err) {
-    sendResponse(res, 500, err.message);
-  }
-});
-
-app.post("/broadcast", async (req, res) => {
-  try {
-    const results = await sendBroadcast(req.body);
-    sendResponse(res, 200, "Broadcast processed", { total: req.body.numbers.length, results });
-  } catch (err) {
-    sendResponse(res, 500, err.message);
-  }
-});
-
-// ----------------------
-// Send individual messages
-// ----------------------
-app.post("/send-message0", async (req, res) => {
-  try {
-    const { phone, message, from, type = "text", mediaUrl, buttons, sections, fileName } = req.body;
-    const results = await sendBroadcast({ from, numbers: [phone], message, type, mediaUrl, buttons, sections, fileName });
-    sendResponse(res, 200, "Message processed", { to: phone, result: results[0] });
-  } catch (err) {
-    sendResponse(res, 500, err.message);
-  }
-});
-
-app.post("/send-message", async (req, res) => {
-  try {
-    const { phone, message } = req.body
-
-    if (!phone || !message) {
-      return sendResponse(res, 400, "phone and message required");
-    }
-
-    // get connected WhatsApp session
-    const connectedPhone = Object.keys(sessions)[0]
-    const sock = sessions[connectedPhone]
-
-    if (!sock) {
-      return sendResponse(res, 400, "WhatsApp not connected");
-    }
-
-    const jid = phone.replace(/\D/g, "") + "@s.whatsapp.net"
-
-    const result = await sock.sendMessage(jid, {
-      text: message
-    })
-
-    sendResponse(res, 200, "Message sent successfully", {
-      from: connectedPhone,
-      to: phone,
-      messageId: result.key.id
-    });
-
-  } catch (err) {
-    sendResponse(res, 500, err.message);
-  }
-})
-
-
-// ----------------------
-// Logout
-// ----------------------
-app.post("/logout", async (req, res) => {
-  try {
-    const { phone } = req.body;
-    if (!phone) return sendResponse(res, 400, "Phone required");
-
-    loggingOut[phone] = true;
-    const sock = sessions[phone];
-
-    if (sock) {
-      try { await sock.logout(); } catch(e) {}
-      try { sock.ws?.close(); } catch(e) {}
-      delete sessions[phone];
-      delete sessionStatus[phone];
-    }
-
-    deleteSessionFolder(phone);
-    delete loggingOut[phone];
-    sendResponse(res, 200, "Logged out and session cleared");
-  } catch (err) {
-    delete loggingOut[req.body.phone];
-    sendResponse(res, 500, err.message);
-  }
-});
-
-// ----------------------
-// Session & Template Management
-// ----------------------
-app.get("/status/:phone", (req, res) => {
-  const phone = req.params.phone;
-  sendResponse(res, 200, "Session status fetched", { phone, status: sessionStatus[phone] || "not_connected" });
-});
-
-app.get("/sessions", (req, res) => {
-  const list = Object.keys(sessions).map(phone => ({ phone, status: sessionStatus[phone] }));
-  sendResponse(res, 200, "Sessions fetched", list);
-});
-
-app.post("/template", (req, res) => {
-  const { keyword, type, content, buttons, list } = req.body;
-  if (!keyword || !type || !content) return sendResponse(res, 400, "keyword, type, content required");
-  templates[keyword.toLowerCase()] = { type, content, buttons, list };
-  sendResponse(res, 200, "Template saved", templates[keyword.toLowerCase()]);
-});
-
-app.get("/templates", (req, res) => sendResponse(res, 200, "Templates fetched", templates));
-
-// ----------------------
-// Start Server & restore sessions
+// Initialization
 // ----------------------
 app.listen(3000, async () => {
   console.log("🚀 WhatsApp API running on http://localhost:3000");
@@ -382,7 +426,6 @@ app.listen(3000, async () => {
     const phones = fs.readdirSync(sessionsDir);
     for (const phone of phones) {
       if (sessionExists(phone)) {
-        console.log(`🔄 Restoring session: ${phone}`);
         await startSession(phone);
       }
     }
