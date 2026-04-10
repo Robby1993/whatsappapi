@@ -30,6 +30,22 @@ const templates = {};
 // ----------------------
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
+/**
+ * Common Response Structure
+ * @param {object} res - Express response object
+ * @param {number} code - HTTP status code
+ * @param {string} message - Message to return
+ * @param {any} result - Data to return
+ */
+function sendResponse(res, code, message, result = null) {
+  res.status(code).json({
+    status: code >= 200 && code < 300,
+    code: code,
+    message: message,
+    result: result
+  });
+}
+
 function sessionFolder(phone) {
   return path.join(__dirname, "sessions", phone);
 }
@@ -226,7 +242,7 @@ async function sendBroadcast({ from, numbers, message, type = "text", mediaUrl, 
 app.post("/connect", async (req, res) => {
   try {
     const { phone } = req.body;
-    if (!phone) return res.status(400).json({ error: "Phone number required" });
+    if (!phone) return sendResponse(res, 400, "Phone number required");
 
     // If session exists → logout + clear (to avoid conflicts)
     if (sessions[phone]) {
@@ -244,18 +260,18 @@ app.post("/connect", async (req, res) => {
     // Connect WhatsApp
     const result = await connectWhatsApp(phone);
 
-    res.json(result);
+    sendResponse(res, 200, "Connection initiated", result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendResponse(res, 500, err.message);
   }
 });
 
 app.post("/broadcast", async (req, res) => {
   try {
     const results = await sendBroadcast(req.body);
-    res.json({ success: true, total: req.body.numbers.length, results });
+    sendResponse(res, 200, "Broadcast processed", { total: req.body.numbers.length, results });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendResponse(res, 500, err.message);
   }
 });
 
@@ -266,22 +282,18 @@ app.post("/send-message0", async (req, res) => {
   try {
     const { phone, message, from, type = "text", mediaUrl, buttons, sections, fileName } = req.body;
     const results = await sendBroadcast({ from, numbers: [phone], message, type, mediaUrl, buttons, sections, fileName });
-    res.json({ success: true, to: phone, result: results[0] });
+    sendResponse(res, 200, "Message processed", { to: phone, result: results[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendResponse(res, 500, err.message);
   }
 });
 
 app.post("/send-message", async (req, res) => {
-
   try {
-
     const { phone, message } = req.body
 
     if (!phone || !message) {
-      return res.status(400).json({
-        error: "phone and message required"
-      })
+      return sendResponse(res, 400, "phone and message required");
     }
 
     // get connected WhatsApp session
@@ -289,9 +301,7 @@ app.post("/send-message", async (req, res) => {
     const sock = sessions[connectedPhone]
 
     if (!sock) {
-      return res.status(400).json({
-        error: "WhatsApp not connected"
-      })
+      return sendResponse(res, 400, "WhatsApp not connected");
     }
 
     const jid = phone.replace(/\D/g, "") + "@s.whatsapp.net"
@@ -300,21 +310,15 @@ app.post("/send-message", async (req, res) => {
       text: message
     })
 
-    res.json({
-      success: true,
+    sendResponse(res, 200, "Message sent successfully", {
       from: connectedPhone,
       to: phone,
       messageId: result.key.id
-    })
+    });
 
   } catch (err) {
-
-    res.status(500).json({
-      error: err.message
-    })
-
+    sendResponse(res, 500, err.message);
   }
-
 })
 
 
@@ -324,7 +328,7 @@ app.post("/send-message", async (req, res) => {
 app.post("/logout", async (req, res) => {
   try {
     const { phone } = req.body;
-    if (!phone) return res.status(400).json({ error: "Phone required" });
+    if (!phone) return sendResponse(res, 400, "Phone required");
 
     loggingOut[phone] = true;
     const sock = sessions[phone];
@@ -338,10 +342,10 @@ app.post("/logout", async (req, res) => {
 
     deleteSessionFolder(phone);
     delete loggingOut[phone];
-    res.json({ success: true, message: "Logged out and session cleared" });
+    sendResponse(res, 200, "Logged out and session cleared");
   } catch (err) {
     delete loggingOut[req.body.phone];
-    res.status(500).json({ error: err.message });
+    sendResponse(res, 500, err.message);
   }
 });
 
@@ -350,22 +354,22 @@ app.post("/logout", async (req, res) => {
 // ----------------------
 app.get("/status/:phone", (req, res) => {
   const phone = req.params.phone;
-  res.json({ phone, status: sessionStatus[phone] || "not_connected" });
+  sendResponse(res, 200, "Session status fetched", { phone, status: sessionStatus[phone] || "not_connected" });
 });
 
 app.get("/sessions", (req, res) => {
   const list = Object.keys(sessions).map(phone => ({ phone, status: sessionStatus[phone] }));
-  res.json(list);
+  sendResponse(res, 200, "Sessions fetched", list);
 });
 
 app.post("/template", (req, res) => {
   const { keyword, type, content, buttons, list } = req.body;
-  if (!keyword || !type || !content) return res.status(400).json({ error: "keyword, type, content required" });
+  if (!keyword || !type || !content) return sendResponse(res, 400, "keyword, type, content required");
   templates[keyword.toLowerCase()] = { type, content, buttons, list };
-  res.json({ success: true, template: templates[keyword.toLowerCase()] });
+  sendResponse(res, 200, "Template saved", templates[keyword.toLowerCase()]);
 });
 
-app.get("/templates", (req, res) => res.json(templates));
+app.get("/templates", (req, res) => sendResponse(res, 200, "Templates fetched", templates));
 
 // ----------------------
 // Start Server & restore sessions
