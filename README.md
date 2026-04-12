@@ -102,3 +102,11 @@ val manager = TemplateManager()
         null -> println("No template found")
     }
 }
+
+
+
+brew tap mongodb/brew
+brew install mongodb-community
+brew services start mongodb-community
+
+ps aux | grep mongod
