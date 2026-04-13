@@ -16,8 +16,9 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// MongoDB
+// prioritize .env values
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/whatsappapi";
+const PORT = process.env.PORT || 3000;
 
 // Routes
 app.use("/auth", authRoutes);
@@ -28,7 +29,12 @@ app.use("/admin", adminRoutes);
 async function init() {
   try {
     console.log("⏳ Connecting to MongoDB...");
-    await mongoose.connect(MONGODB_URI);
+
+    // 5 seconds timeout to detect if service is off
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+    });
+
     console.log("🍃 MongoDB Connected");
 
     const sessionsDir = path.join(__dirname, "sessions");
@@ -38,27 +44,27 @@ async function init() {
     schedulerWorker(sessions, sessionStatus, startSession);
     queueWorker(sessions, sessionStatus, startSession);
 
-    const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
 
       // Restore sessions
-      fs.readdirSync(sessionsDir).forEach(phone => {
-        const creds = path.join(sessionsDir, phone, "creds.json");
-        if (fs.existsSync(creds)) {
-          console.log(`🔄 Restoring session: ${phone}`);
-          startSession(phone);
-        }
-      });
+      if (fs.existsSync(sessionsDir)) {
+        fs.readdirSync(sessionsDir).forEach(phone => {
+          const creds = path.join(sessionsDir, phone, "creds.json");
+          if (fs.existsSync(creds)) {
+            console.log(`🔄 Restoring session: ${phone}`);
+            startSession(phone);
+          }
+        });
+      }
     });
   } catch (err) {
-  //  console.error("Startup error:", err.message);
-    if (err.message.includes("ECONNREFUSED")) {
-       console.error("MongoDB is not running. Start it and retry.");
+    if (err.message.includes("ECONNREFUSED") || err.name === "MongooseServerSelectionError") {
+       console.error("❌ MongoDB is NOT running at 127.0.0.1:27017.");
+       console.log("👉 ACTION: Open 'Services' on your computer and start 'MongoDB Server'.");
      } else {
-       console.error("Startup error:", err.message);
+       console.error("❌ Startup error:", err.message);
      }
-
     process.exit(1);
   }
 }
