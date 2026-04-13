@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(cors());
 
 // prioritize .env values. On Render, set MONGODB_URI in the Environment Variables dashboard.
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/whatsappapi";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://robinsonmacwan93_db_user:<db_password>@cluster0.0g318ha.mongodb.net/?appName=Cluster0";
 const PORT = process.env.PORT || 3000;
 
 // Routes
