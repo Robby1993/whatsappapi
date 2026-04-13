@@ -16,7 +16,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// prioritize .env values
+// prioritize .env values. On Render, set MONGODB_URI in the Environment Variables dashboard.
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/whatsappapi";
 const PORT = process.env.PORT || 3000;
 
@@ -30,12 +30,11 @@ async function init() {
   try {
     console.log("⏳ Connecting to MongoDB...");
 
-    // 5 seconds timeout to detect if service is off
     await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
     });
 
-    console.log("🍃 MongoDB Connected");
+    console.log("🍃 MongoDB Connected Successfully");
 
     const sessionsDir = path.join(__dirname, "sessions");
     if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
@@ -44,8 +43,9 @@ async function init() {
     schedulerWorker(sessions, sessionStatus, startSession);
     queueWorker(sessions, sessionStatus, startSession);
 
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    // Use "0.0.0.0" to ensure it's accessible on cloud platforms like Render
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
 
       // Restore sessions
       if (fs.existsSync(sessionsDir)) {
@@ -59,12 +59,13 @@ async function init() {
       }
     });
   } catch (err) {
-    if (err.message.includes("ECONNREFUSED") || err.name === "MongooseServerSelectionError") {
-       console.error("❌ MongoDB is NOT running at 127.0.0.1:27017.");
-       console.log("👉 ACTION: Open 'Services' on your computer and start 'MongoDB Server'.");
-     } else {
-       console.error("❌ Startup error:", err.message);
-     }
+    console.error("❌ MongoDB Connection Error:", err.message);
+
+    if (MONGODB_URI.includes("127.0.0.1") || MONGODB_URI.includes("localhost")) {
+       console.log("\n💡 TIP: You are trying to connect to a local DB. If you are on Render, you MUST use MongoDB Atlas.");
+       console.log("👉 ACTION: Add MONGODB_URI to your Render Environment Variables.");
+    }
+
     process.exit(1);
   }
 }
