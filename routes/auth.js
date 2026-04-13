@@ -2,7 +2,8 @@ const express = require("express");
 const crypto = require("crypto");
 const User = require("../models/User");
 const Token = require("../models/Token");
-const { sendResponse } = require("../middleware/auth");
+const Plan = require("../models/Plan");
+const { authenticate, sendResponse } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -19,13 +20,12 @@ router.post("/register", async (req, res) => {
       name: name || "User",
       gender: gender || "N/A",
       password,
-      userType: userType === "admin" ? "admin" : "user"
+      userType: userType === "admin" ? "admin" : "user",
+      validDays: 3
     });
 
     sendResponse(res, 201, "Registration successful", newUser);
-  } catch (err) {
-    sendResponse(res, 500, "Registration failed", err.message);
-  }
+  } catch (err) { sendResponse(res, 500, "Registration failed", err.message); }
 });
 
 router.post("/login", async (req, res) => {
@@ -41,9 +41,7 @@ router.post("/login", async (req, res) => {
     await Token.create({ token, number: user.number, userType: user.userType });
 
     sendResponse(res, 200, "Login successful", { token, user });
-  } catch (err) {
-    sendResponse(res, 500, "Login failed", err.message);
-  }
+  } catch (err) { sendResponse(res, 500, "Login failed", err.message); }
 });
 
 router.post("/forgot-password", async (req, res) => {
@@ -52,9 +50,43 @@ router.post("/forgot-password", async (req, res) => {
     const user = await User.findOneAndUpdate({ number }, { password: newPassword }, { new: true });
     if (!user) return sendResponse(res, 404, "User not found");
     sendResponse(res, 200, "Password updated successfully");
-  } catch (err) {
-    sendResponse(res, 500, "Update failed", err.message);
-  }
+  } catch (err) { sendResponse(res, 500, "Update failed", err.message); }
+});
+
+// PROTECTED USER ROUTES
+router.use(authenticate);
+
+router.post("/update-profile", async (req, res) => {
+  try {
+    const { name, gender, password } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (gender) update.gender = gender;
+    if (password) update.password = password;
+
+    const user = await User.findOneAndUpdate({ number: req.userNumber }, update, { new: true });
+    sendResponse(res, 200, "Profile updated successfully", user);
+  } catch (err) { sendResponse(res, 500, "Update failed", err.message); }
+});
+
+router.post("/buy-subscription", async (req, res) => {
+  try {
+    const { planId } = req.body;
+    const plan = await Plan.findOne({ id: planId });
+    if (!plan) return sendResponse(res, 400, "Invalid plan");
+
+    const user = await User.findOne({ number: req.userNumber });
+    const expiry = user.createdAt + (user.validDays * 86400000);
+
+    if (Date.now() < expiry) {
+      user.validDays += plan.days;
+    } else {
+      user.createdAt = Date.now();
+      user.validDays = plan.days;
+    }
+    await user.save();
+    sendResponse(res, 200, "Subscription purchased successfully", user);
+  } catch (err) { sendResponse(res, 500, "Purchase failed", err.message); }
 });
 
 module.exports = router;

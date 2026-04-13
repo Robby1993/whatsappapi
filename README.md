@@ -110,3 +110,5 @@ brew install mongodb-community
 brew services start mongodb-community
 
 ps aux | grep mongod
+robinsonmacwan93_db_user
+HFgPnG3GKWGoT48b

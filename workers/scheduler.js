@@ -10,7 +10,7 @@ module.exports = function(sessions, sessionStatus, startSession) {
 
       for (const msg of pending) {
         if (!sessions[msg.sender] || sessionStatus[msg.sender]?.status !== "connected") {
-          // Attempt to restore session if it exists
+          // In a real app, you might want to call startSession(msg.sender) here if it's not running
           continue;
         }
         try {

@@ -1,437 +1,385 @@
 {
-  "info": {
-    "_postman_id": "c944a675-cbdb-4b2e-8c20-1ec61ad974f6",
-    "name": "WA",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "53107502",
-    "_collection_link": "https://go.postman.co/collection/53107502-c944a675-cbdb-4b2e-8c20-1ec61ad974f6?source=collection_link"
-  },
-  "item": [
-    {
-      "name": "SendTemplate",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\"phone\":\"919876543210\",\"text\":\"Do you want to continue?\"}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/send-template",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "send-template"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "SendDocument",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\r\n    \"phone\": \"919876543210\",\r\n    \"fileUrl\": \"https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf\",\r\n    \"fileName\": \"test.pdf\"\r\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/send-document",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "send-document"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Ssend-video",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n \"from\":\"918000483847\",\n \"to\":\"919876543210\",\n \"url\":\"https://samplelib.com/lib/preview/mp4/sample-5s.mp4\",\n \"caption\":\"Test video\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/send-video",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "send-video"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Send-image",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "type": "text",
-              "key": "phone",
-              "value": "918000483847"
-            },
-            {
-              "type": "text",
-              "key": "to",
-              "value": "919876543210",
-              "disabled": true
-            },
-            {
-              "type": "file",
-              "key": "image",
-              "src": [
-                "/C:/Users/hp/AppData/Local/Programs/Antigravity/Antigravity.exe",
-                "/C:/Users/hp/Pictures/Screenshot 2026-03-25 095903.png"
-              ]
-            },
-            {
-              "type": "text",
-              "key": "caption",
-              "value": "Local Image"
-            }
-          ]
-        },
-        "url": {
-          "raw": "http://localhost:3000/send-image",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "send-image"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Send-message",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\"phone\":\"91800483847\",\r\n\"message\":\"working\"}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/send-message",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "send-message"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Connect",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "body": {
-          "mode": "raw",
-          "raw": "{\r\n  \"phone\": \"918866813729\"\r\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/connect",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "connect"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "logout",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"phone\": \"918866813729\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/logout",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "logout"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Broadcast",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n \"from\":\"918866813729\",\n \"numbers\":[\n   \"918000483847\",\n   \"918511553881\"\n ],\n \"message\":\"Hello everyone\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/broadcast",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "broadcast"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "http://localhost:3000/send-template",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"phone\": \"918000483847\",\n    \"type\": \"text\",\n    \"text\": \"Hello from API!\"\n  }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/send-template",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "send-template"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "http://localhost:3000/send-template",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"phone\": \"918000483847\",\n    \"type\": \"buttons\",\n    \"text\": \"Do you want to continue?\",\n    \"buttons\": [\"Yes\", \"No\"]\n  }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/send-template",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "send-template"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "http://localhost:3000/send-template",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"phone\": \"918000483847\",\n    \"type\": \"list\",\n    \"text\": \"Select your plan\",\n    \"sections\": [\n      {\n        \"title\": \"Monthly Plans\",\n        \"rows\": [\n          {\"title\": \"Basic\", \"rowId\": \"plan_basic\", \"description\": \"Basic monthly plan\"},\n          {\"title\": \"Pro\", \"rowId\": \"plan_pro\", \"description\": \"Pro monthly plan\"}\n        ]\n      }\n    ]\n  }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/send-template",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "send-template"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "http://localhost:3000/send-template",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"phone\": \"918000483847\",\n    \"type\": \"image\",\n    \"mediaUrl\": \"https://example.com/image.jpg\",\n    \"caption\": \"Check this image!\"\n  }",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "url": {
-          "raw": "http://localhost:3000/send-template",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "send-template"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "http://localhost:3000/status/918866813729",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "http://localhost:3000/status/918866813729",
-          "protocol": "http",
-          "host": [
-            "localhost"
-          ],
-          "port": "3000",
-          "path": [
-            "status",
-            "918866813729"
-          ]
-        }
-      },
-      "response": []
-    }
-  ]
+	"info": {
+		"_postman_id": "whatsapp-api-modular",
+		"name": "WhatsApp API Modular",
+		"description": "Collection for the modular WhatsApp API including Auth, WhatsApp connection, and Admin routes.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Raj Patel\",\n    \"number\": \"911234567890\",\n    \"password\": \"password123\",\n    \"gender\": \"Male\",\n    \"userType\": \"user\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"number\": \"911234567890\",\n    \"password\": \"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"number\": \"911234567890\",\n    \"newPassword\": \"new_password_123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/forgot-password",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"forgot-password"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "WhatsApp",
+			"item": [
+				{
+					"name": "Connect via QR",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone\": \"911234567890\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/whatsapp/connect-qr",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"whatsapp",
+								"connect-qr"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Connect via Pairing Code",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone\": \"911234567890\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/whatsapp/connect-pair",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"whatsapp",
+								"connect-pair"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Session Status",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/whatsapp/session-status?phone=911234567890",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"whatsapp",
+								"session-status"
+							],
+							"query": [
+								{
+									"key": "phone",
+									"value": "911234567890"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Message",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone\": \"910987654321\",\n    \"message\": \"Hello from Modular API!\",\n    \"from\": \"911234567890\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/whatsapp/send-message",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"whatsapp",
+								"send-message"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone\": \"911234567890\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/whatsapp/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"whatsapp",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Get All Users",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/users",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{auth_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"number\": \"911234567890\",\n    \"isActive\": true,\n    \"validDays\": 30\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/update-user",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"admin",
+								"update-user"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5001",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "PASTE_YOUR_TOKEN_HERE",
+			"type": "string"
+		}
+	]
 }
