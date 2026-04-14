@@ -1,7 +1,6 @@
 const Token = require("../models/Token");
 const User = require("../models/User");
 
-// Common response helper
 function sendResponse(res, code, message, result = null) {
   res.status(code).json({
     status: code >= 200 && code < 300,
@@ -18,12 +17,12 @@ async function authenticate(req, res, next) {
   if (!tokenString) return sendResponse(res, 401, "Token required");
 
   try {
-    const tokenData = await Token.findOne({ token: tokenString });
+    const tokenData = await Token.findOne({ where: { token: tokenString } });
     if (!tokenData) return sendResponse(res, 401, "Invalid token");
 
-    const user = await User.findOne({ number: tokenData.number });
+    const user = await User.findOne({ where: { number: tokenData.number } });
     if (!user || !user.isActive) {
-      await Token.deleteOne({ token: tokenString });
+      await Token.destroy({ where: { token: tokenString } });
       return sendResponse(res, 403, "Access denied");
     }
 

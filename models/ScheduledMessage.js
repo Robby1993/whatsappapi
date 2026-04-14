@@ -1,12 +1,15 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
 
-const ScheduledMessageSchema = new mongoose.Schema({
-  sender: String,
-  receiver: String,
-  message: String,
-  scheduleTime: Number,
-  status: { type: String, enum: ["pending", "sent", "failed"], default: "pending" },
-  createdAt: { type: Number, default: Date.now }
+const ScheduledMessage = sequelize.define("ScheduledMessage", {
+  sender: { type: DataTypes.STRING },
+  receiver: { type: DataTypes.STRING },
+  message: { type: DataTypes.TEXT },
+  scheduleTime: { type: DataTypes.BIGINT },
+  status: { type: DataTypes.ENUM("pending", "sent", "failed"), defaultValue: "pending" },
+  createdAt: { type: DataTypes.BIGINT, defaultValue: () => Date.now() }
+}, {
+  timestamps: false
 });
 
-module.exports = mongoose.model("ScheduledMessage", ScheduledMessageSchema);
+module.exports = ScheduledMessage;

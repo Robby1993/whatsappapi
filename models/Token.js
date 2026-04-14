@@ -1,9 +1,12 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
 
-const TokenSchema = new mongoose.Schema({
-  token: { type: String, required: true, unique: true },
-  number: { type: String, required: true },
-  userType: { type: String, required: true }
+const Token = sequelize.define("Token", {
+  token: { type: DataTypes.STRING, allowNull: false, unique: true },
+  number: { type: DataTypes.STRING, allowNull: false },
+  userType: { type: DataTypes.STRING, allowNull: false }
+}, {
+  timestamps: false
 });
 
-module.exports = mongoose.model("Token", TokenSchema);
+module.exports = Token;

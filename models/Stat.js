@@ -1,7 +1,11 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
 
-const StatSchema = new mongoose.Schema({
-  totalMessagesSent: { type: Number, default: 0 }
+const Stat = sequelize.define("Stat", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  totalMessagesSent: { type: DataTypes.INTEGER, defaultValue: 0 }
+}, {
+  timestamps: false
 });
 
-module.exports = mongoose.model("Stat", StatSchema);
+module.exports = Stat;

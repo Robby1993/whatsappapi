@@ -1,15 +1,18 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
 
-const TemplateSchema = new mongoose.Schema({
-  keyword: { type: String, required: true, unique: true },
-  type: { type: String, required: true },
-  content: { type: String, default: "" },
-  buttons: { type: Array, default: [] },
-  footer: { type: String, default: "" },
-  header: { type: String, default: "" },
-  sections: { type: Array, default: [] },
-  mediaUrl: { type: String, default: "" },
-  fileName: { type: String, default: "" }
+const Template = sequelize.define("Template", {
+  keyword: { type: DataTypes.STRING, primaryKey: true },
+  type: { type: DataTypes.STRING, allowNull: false },
+  content: { type: DataTypes.TEXT, defaultValue: "" },
+  buttons: { type: DataTypes.JSON, defaultValue: [] },
+  footer: { type: DataTypes.STRING, defaultValue: "" },
+  header: { type: DataTypes.STRING, defaultValue: "" },
+  sections: { type: DataTypes.JSON, defaultValue: [] },
+  mediaUrl: { type: DataTypes.STRING, defaultValue: "" },
+  fileName: { type: DataTypes.STRING, defaultValue: "" }
+}, {
+  timestamps: false
 });
 
-module.exports = mongoose.model("Template", TemplateSchema);
+module.exports = Template;

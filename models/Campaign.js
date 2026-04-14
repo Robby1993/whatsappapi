@@ -1,14 +1,17 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
 
-const CampaignSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  sender: { type: String, required: true },
-  message: String,
-  totalContacts: { type: Number, default: 0 },
-  sentCount: { type: Number, default: 0 },
-  failedCount: { type: Number, default: 0 },
-  status: { type: String, enum: ["pending", "processing", "completed"], default: "pending" },
-  createdAt: { type: Number, default: Date.now }
+const Campaign = sequelize.define("Campaign", {
+  name: { type: DataTypes.STRING, allowNull: false },
+  sender: { type: DataTypes.STRING, allowNull: false },
+  message: { type: DataTypes.TEXT },
+  totalContacts: { type: DataTypes.INTEGER, defaultValue: 0 },
+  sentCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+  failedCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+  status: { type: DataTypes.ENUM("pending", "processing", "completed"), defaultValue: "pending" },
+  createdAt: { type: DataTypes.BIGINT, defaultValue: () => Date.now() }
+}, {
+  timestamps: false
 });
 
-module.exports = mongoose.model("Campaign", CampaignSchema);
+module.exports = Campaign;

@@ -1,13 +1,16 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
 
-const MessageLogSchema = new mongoose.Schema({
-  sender: String,
-  receiver: String,
-  message: String,
-  type: { type: String, default: "text" },
-  status: String,
-  timestamp: { type: Number, default: Date.now },
-  campaignId: { type: mongoose.Schema.Types.ObjectId, ref: "Campaign" }
+const MessageLog = sequelize.define("MessageLog", {
+  sender: { type: DataTypes.STRING },
+  receiver: { type: DataTypes.STRING },
+  message: { type: DataTypes.TEXT },
+  type: { type: DataTypes.STRING, defaultValue: "text" },
+  status: { type: DataTypes.STRING },
+  timestamp: { type: DataTypes.BIGINT, defaultValue: () => Date.now() },
+  campaignId: { type: DataTypes.INTEGER } // Foreign key manually or via associations
+}, {
+  timestamps: false
 });
 
-module.exports = mongoose.model("MessageLog", MessageLogSchema);
+module.exports = MessageLog;

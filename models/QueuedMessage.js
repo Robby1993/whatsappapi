@@ -1,12 +1,15 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
 
-const QueuedMessageSchema = new mongoose.Schema({
-  sender: String,
-  receiver: String,
-  message: String,
-  status: { type: String, enum: ["pending", "processing", "sent", "failed"], default: "pending" },
-  campaignId: { type: mongoose.Schema.Types.ObjectId, ref: "Campaign" },
-  createdAt: { type: Number, default: Date.now }
+const QueuedMessage = sequelize.define("QueuedMessage", {
+  sender: { type: DataTypes.STRING },
+  receiver: { type: DataTypes.STRING },
+  message: { type: DataTypes.TEXT },
+  status: { type: DataTypes.ENUM("pending", "processing", "sent", "failed"), defaultValue: "pending" },
+  campaignId: { type: DataTypes.INTEGER },
+  createdAt: { type: DataTypes.BIGINT, defaultValue: () => Date.now() }
+}, {
+  timestamps: false
 });
 
-module.exports = mongoose.model("QueuedMessage", QueuedMessageSchema);
+module.exports = QueuedMessage;

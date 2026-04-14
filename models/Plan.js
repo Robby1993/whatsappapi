@@ -1,10 +1,13 @@
-const mongoose = require("mongoose");
+const { DataTypes } = require("sequelize");
+const sequelize = require("../db");
 
-const PlanSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
-  days: { type: Number, required: true },
-  price: { type: Number, required: true }
+const Plan = sequelize.define("Plan", {
+  id: { type: DataTypes.STRING, primaryKey: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  days: { type: DataTypes.INTEGER, allowNull: false },
+  price: { type: DataTypes.FLOAT, allowNull: false }
+}, {
+  timestamps: false
 });
 
-module.exports = mongoose.model("Plan", PlanSchema);
+module.exports = Plan;
