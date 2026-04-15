@@ -1,24 +1,30 @@
 const ScheduledMessage = require("../models/ScheduledMessage");
 const MessageLog = require("../models/MessageLog");
 const Stat = require("../models/Stat");
+const { Op } = require("sequelize");
 
 module.exports = function(sessions, sessionStatus, startSession) {
   setInterval(async () => {
     try {
       const now = Date.now();
-      const pending = await ScheduledMessage.find({ status: "pending", scheduleTime: { $lte: now } });
+      // Find all pending messages that are due
+      const pending = await ScheduledMessage.findAll({
+        where: {
+          status: "pending",
+          scheduleTime: { [Op.lte]: now }
+        }
+      });
 
       for (const msg of pending) {
         if (!sessions[msg.sender] || sessionStatus[msg.sender]?.status !== "connected") {
-          // In a real app, you might want to call startSession(msg.sender) here if it's not running
+          console.log(`⏰ Scheduler: Sender ${msg.sender} not connected, skipping...`);
           continue;
         }
         try {
           const jid = msg.receiver.replace(/\D/g, "") + "@s.whatsapp.net";
           await sessions[msg.sender].sendMessage(jid, { text: msg.message });
 
-          msg.status = "sent";
-          await msg.save();
+          await msg.update({ status: "sent" });
 
           await MessageLog.create({
             sender: msg.sender,
@@ -27,16 +33,20 @@ module.exports = function(sessions, sessionStatus, startSession) {
             status: "sent"
           });
 
-          await Stat.findOneAndUpdate({}, { $inc: { totalMessagesSent: 1 } }, { upsert: true });
+          // Increment global stats
+          const [stat] = await Stat.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
+          await stat.increment('totalMessagesSent');
+
         } catch (e) {
-          if (now - msg.scheduleTime > 3600000) {
-            msg.status = "failed";
-            await msg.save();
+          console.error(`❌ Scheduler error for ${msg.receiver}:`, e.message);
+          // If message is older than 1 hour, mark as failed
+          if (now - Number(msg.scheduleTime) > 3600000) {
+            await msg.update({ status: "failed" });
           }
         }
       }
     } catch (e) {
-      console.error("Scheduler worker error:", e.message);
+      console.error("Scheduler worker interval error:", e.message);
     }
   }, 30000);
 };

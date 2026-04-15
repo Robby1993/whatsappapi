@@ -1,10 +1,11 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const mongoose = require("mongoose");
 const path = require("path");
-const fs = require("fs");
 
+const sequelize = require("./db");
+const User = require("./models/User");
+const Session = require("./models/Session");
 const authRoutes = require("./routes/auth");
 const { router: whatsappRoutes, startSession, sessions, sessionStatus } = require("./routes/whatsapp");
 const adminRoutes = require("./routes/admin");
@@ -17,7 +18,6 @@ app.use(express.json());
 app.use(cors());
 
 // prioritize .env values
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/whatsappapi";
 const PORT = process.env.PORT || 3000;
 
 // Routes
@@ -28,43 +28,41 @@ app.use("/admin", adminRoutes);
 // Startup
 async function init() {
   try {
-    console.log("⏳ Connecting to MongoDB...");
+    console.log("🐘 Connecting to PostgreSQL...");
 
-    // 5 seconds timeout to detect if service is off
-    await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-    });
+    await sequelize.authenticate();
+    console.log("✅ PostgreSQL Connected Successfully");
 
-    console.log("🍃 MongoDB Connected");
-
-    const sessionsDir = path.join(__dirname, "sessions");
-    if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
+    // Sync database models (creates tables if they don't exist)
+    await sequelize.sync({ alter: true });
+    console.log("💾 Database Synced");
 
     // Start Workers
     schedulerWorker(sessions, sessionStatus, startSession);
     queueWorker(sessions, sessionStatus, startSession);
 
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    app.listen(PORT, "0.0.0.0", async () => {
+      console.log(`🚀 Server running on port ${PORT}`);
 
-      // Restore sessions
-      if (fs.existsSync(sessionsDir)) {
-        fs.readdirSync(sessionsDir).forEach(phone => {
-          const creds = path.join(sessionsDir, phone, "creds.json");
-          if (fs.existsSync(creds)) {
-            console.log(`🔄 Restoring session: ${phone}`);
-            startSession(phone);
-          }
+      // Restore active sessions from PostgreSQL Database
+      try {
+        const activeSessions = await Session.findAll({
+          where: { dataType: "creds", dataId: "base" }
         });
+
+        for (const session of activeSessions) {
+          console.log(`🔄 Restoring session from DB: ${session.phone}`);
+          startSession(session.phone);
+        }
+      } catch (e) {
+        console.error("❌ Failed to restore sessions:", e.message);
       }
     });
   } catch (err) {
-    if (err.message.includes("ECONNREFUSED") || err.name === "MongooseServerSelectionError") {
-       console.error("❌ MongoDB is NOT running at 127.0.0.1:27017.");
-       console.log("👉 ACTION: Open 'Services' on your computer and start 'MongoDB Server'.");
-     } else {
-       console.error("❌ Startup error:", err.message);
-     }
+    console.error("❌ PostgreSQL Connection Error:", err.message);
+    if (err.message.includes("ECONNREFUSED")) {
+       console.log("👉 ACTION: Make sure your PostgreSQL server is running and the credentials in .env are correct.");
+    }
     process.exit(1);
   }
 }

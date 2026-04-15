@@ -1,11 +1,15 @@
 const { Sequelize } = require("sequelize");
 require("dotenv").config();
 
+// Render External URLs require SSL.
+// We enable it if the URL contains 'render.com'
+const isRender = process.env.DATABASE_URL && process.env.DATABASE_URL.includes("render.com");
+
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: "postgres",
-  logging: false, // Set to console.log to see SQL queries
+  logging: false,
   dialectOptions: {
-    ssl: process.env.NODE_ENV === "production" ? {
+    ssl: isRender ? {
       require: true,
       rejectUnauthorized: false
     } : false

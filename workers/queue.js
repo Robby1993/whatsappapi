@@ -8,14 +8,16 @@ const delay = (ms) => new Promise(r => setTimeout(r, ms));
 module.exports = function(sessions, sessionStatus, startSession) {
   setInterval(async () => {
     try {
-      const msg = await QueuedMessage.findOneAndUpdate({ status: "pending" }, { status: "processing" });
+      // Find one pending message
+      const msg = await QueuedMessage.findOne({ where: { status: "pending" } });
       if (!msg) return;
 
+      // Mark as processing
+      await msg.update({ status: "processing" });
+
       if (!sessions[msg.sender] || sessionStatus[msg.sender]?.status !== "connected") {
-        // If session exists but not connected, try to start it
-        // Note: startSession is async, we don't necessarily want to await it here to block the interval
-        msg.status = "pending";
-        await msg.save();
+        console.log(`⏳ Queue: Sender ${msg.sender} not connected, skipping...`);
+        await msg.update({ status: "pending" });
         return;
       }
 
@@ -23,14 +25,15 @@ module.exports = function(sessions, sessionStatus, startSession) {
         const jid = msg.receiver.replace(/\D/g, "") + "@s.whatsapp.net";
         await sessions[msg.sender].sendMessage(jid, { text: msg.message });
 
-        msg.status = "sent";
-        await msg.save();
+        await msg.update({ status: "sent" });
 
         if (msg.campaignId) {
-          await Campaign.findByIdAndUpdate(msg.campaignId, { $inc: { sentCount: 1 } });
-          const camp = await Campaign.findById(msg.campaignId);
-          if (camp && camp.sentCount + camp.failedCount >= camp.totalContacts) {
-            await Campaign.findByIdAndUpdate(msg.campaignId, { status: "completed" });
+          const campaign = await Campaign.findByPk(msg.campaignId);
+          if (campaign) {
+            await campaign.increment('sentCount');
+            if (campaign.sentCount + campaign.failedCount >= campaign.totalContacts) {
+              await campaign.update({ status: "completed" });
+            }
           }
         }
 
@@ -42,15 +45,17 @@ module.exports = function(sessions, sessionStatus, startSession) {
           campaignId: msg.campaignId
         });
 
-        await Stat.findOneAndUpdate({}, { $inc: { totalMessagesSent: 1 } }, { upsert: true });
+        // Increment global stats
+        const [stat] = await Stat.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
+        await stat.increment('totalMessagesSent');
 
         await delay(2000); // Throttling
       } catch (e) {
-        console.error(`Error sending queued message to ${msg.receiver}:`, e.message);
-        msg.status = "failed";
-        await msg.save();
+        console.error(`❌ Error sending queued message to ${msg.receiver}:`, e.message);
+        await msg.update({ status: "failed" });
         if (msg.campaignId) {
-          await Campaign.findByIdAndUpdate(msg.campaignId, { $inc: { failedCount: 1 } });
+          const campaign = await Campaign.findByPk(msg.campaignId);
+          if (campaign) await campaign.increment('failedCount');
         }
       }
     } catch (e) {
