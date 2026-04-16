@@ -14,16 +14,15 @@ const User = sequelize.define("User", {
     defaultValue: "user"
   },
   validDays: { type: DataTypes.INTEGER, defaultValue: 3 },
-  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  isActive: { type: Boolean, defaultValue: true },
+  webhookUrl: { type: DataTypes.STRING, allowNull: true },
 
-  // Matches your existing BIGINT data in PostgreSQL
   createdAt: {
     type: DataTypes.BIGINT,
     allowNull: true,
     defaultValue: () => Date.now()
   },
 
-  // These are new columns, so they can be DATE types
   updatedAt: {
     type: DataTypes.DATE,
     allowNull: true,

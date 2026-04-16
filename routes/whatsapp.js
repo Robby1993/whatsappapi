@@ -1,6 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const axios = require("axios");
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -15,7 +16,8 @@ const Campaign = require("../models/Campaign");
 const Template = require("../models/Template");
 const ScheduledMessage = require("../models/ScheduledMessage");
 const QueuedMessage = require("../models/QueuedMessage");
-const Plan = require("../models/Plan");
+const User = require("../models/User");
+const ChatFlow = require("../models/ChatFlow");
 const { authenticate, sendResponse } = require("../middleware/auth");
 
 const router = express.Router();
@@ -53,6 +55,7 @@ async function forceLogoutWhatsApp(phone) {
     try {
       sessions[phone].ev.removeAllListeners("creds.update");
       sessions[phone].ev.removeAllListeners("connection.update");
+      sessions[phone].ev.removeAllListeners("messages.upsert");
       if (sessions[phone].ws?.readyState === 1) await sessions[phone].logout().catch(() => {});
       if (sessions[phone].ws) sessions[phone].ws.close();
     } catch (e) {}
@@ -63,6 +66,80 @@ async function forceLogoutWhatsApp(phone) {
   if (fs.existsSync(folder)) fs.rmSync(folder, { recursive: true, force: true });
   await delay(1000);
   delete loggingOut[phone];
+}
+
+async function handleIncomingMessage(phone, m) {
+  try {
+    if (!m.messages || m.type !== "notify") return;
+    const msg = m.messages[0];
+    if (msg.key.fromMe) return;
+
+    const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
+    const sender = msg.key.remoteJid;
+
+    // 1. Dynamic ChatFlow (Auto Reply)
+    if (text) {
+      const flow = await ChatFlow.findOne({
+        where: {
+          userNumber: phone,
+          triggerKeyword: text.toLowerCase().trim(),
+          isActive: true
+        }
+      });
+
+      if (flow) {
+        let response = {};
+        switch (flow.responseType) {
+          case "text":
+            response = { text: flow.responseText };
+            break;
+          case "image":
+          case "video":
+          case "audio":
+          case "document":
+            response = { [flow.responseType]: { url: flow.mediaUrl }, caption: flow.responseText };
+            break;
+          case "buttons":
+            response = {
+              text: flow.responseText,
+              footer: flow.footer,
+              buttons: flow.buttons.map((b, i) => ({ buttonId: `btn_${i}`, buttonText: { displayText: b }, type: 1 })),
+              headerType: 1
+            };
+            break;
+          case "list":
+            response = {
+              text: flow.responseText,
+              title: flow.header,
+              footer: flow.footer,
+              buttonText: "View Options",
+              sections: flow.sections
+            };
+            break;
+        }
+        await sessions[phone].sendMessage(sender, response);
+      }
+    }
+
+    // 2. Webhook Notifications
+    const user = await User.findOne({ where: { number: phone } });
+    const admin = await User.findOne({ where: { userType: "admin" } });
+
+    const payload = {
+      phone,
+      sender,
+      pushName: msg.pushName,
+      message: text || "Media Message",
+      timestamp: msg.messageTimestamp,
+      raw: msg
+    };
+
+    if (user?.webhookUrl) axios.post(user.webhookUrl, payload).catch(() => {});
+    if (admin?.webhookUrl && admin.number !== phone) axios.post(admin.webhookUrl, { ...payload, userNumber: phone }).catch(() => {});
+
+  } catch (err) {
+    console.error("Incoming Message Error:", err.message);
+  }
 }
 
 async function initWhatsApp(phone) {
@@ -79,10 +156,7 @@ async function initWhatsApp(phone) {
     browser: Browsers.ubuntu("Chrome"),
     syncFullHistory: false,
     shouldSyncHistoryMessage: () => false,
-    connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 0,
-    keepAliveIntervalMs: 10000,
-    generateHighQualityLinkPreview: false
+    connectTimeoutMs: 60000
   });
 
   sessions[phone] = sock;
@@ -91,17 +165,16 @@ async function initWhatsApp(phone) {
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
+    if (!sessionStatus[phone]) sessionStatus[phone] = { status: "connecting" };
     if (qr) sessionStatus[phone].qr = qr;
 
     if (connection === "open") {
-      sessionStatus[phone] = { status: "connected" };
+      sessionStatus[phone].status = "connected";
       console.log(`✅ WhatsApp Connected: ${phone}`);
     }
 
     if (connection === "close") {
       const reason = lastDisconnect?.error?.output?.statusCode;
-      console.log(`❌ Connection Closed (${phone}): ${reason}`);
-
       if (reason === DisconnectReason.loggedOut) {
         delete sessions[phone];
         delete sessionStatus[phone];
@@ -113,6 +186,8 @@ async function initWhatsApp(phone) {
     }
   });
 
+  sock.ev.on("messages.upsert", (m) => handleIncomingMessage(phone, m));
+
   return sock;
 }
 
@@ -122,6 +197,65 @@ async function startSession(phone) {
 }
 
 router.use(authenticate);
+
+// --- CHATFLOW APIS ---
+
+/**
+ * @api {post} /whatsapp/chatflows Create ChatFlow
+ * @body {String} triggerKeyword, {String} responseType (text|image|video|audio|document|buttons|list), {String} responseText, {String} mediaUrl, {Array} buttons, {Array} sections, {String} footer, {String} header, {Boolean} isActive
+ */
+router.post("/chatflows", async (req, res) => {
+  try {
+    const flow = await ChatFlow.create({ ...req.body, userNumber: req.userNumber });
+    sendResponse(res, 201, "ChatFlow created", flow);
+  } catch (err) { sendResponse(res, 500, "Failed to create ChatFlow", err.message); }
+});
+
+/**
+ * @api {get} /whatsapp/chatflows List ChatFlows
+ */
+router.get("/chatflows", async (req, res) => {
+  try {
+    const flows = await ChatFlow.findAll({ where: { userNumber: req.userNumber } });
+    sendResponse(res, 200, "ChatFlows fetched", flows);
+  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
+});
+
+/**
+ * @api {put} /whatsapp/chatflows/:id Update ChatFlow
+ */
+router.put("/chatflows/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const flow = await ChatFlow.findOne({ where: { id, userNumber: req.userNumber } });
+    if (!flow) return sendResponse(res, 404, "ChatFlow not found");
+
+    await flow.update(req.body);
+    sendResponse(res, 200, "ChatFlow updated", flow);
+  } catch (err) { sendResponse(res, 500, "Update failed", err.message); }
+});
+
+/**
+ * @api {delete} /whatsapp/chatflows/:id Delete ChatFlow
+ */
+router.delete("/chatflows/:id", async (req, res) => {
+  try {
+    await ChatFlow.destroy({ where: { id: req.params.id, userNumber: req.userNumber } });
+    sendResponse(res, 200, "ChatFlow deleted");
+  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
+});
+
+// --- REMAINING APIS ---
+
+router.post("/set-webhook", async (req, res) => {
+  try {
+    const { webhookUrl } = req.body;
+    await User.update({ webhookUrl }, { where: { number: req.userNumber } });
+    sendResponse(res, 200, "Webhook URL updated successfully");
+  } catch (err) {
+    sendResponse(res, 500, "Failed to update webhook", err.message);
+  }
+});
 
 router.post("/connect-pair", async (req, res) => {
   try {
@@ -135,13 +269,13 @@ router.post("/connect-pair", async (req, res) => {
 
     if (!sock.authState.creds.registered) {
       const code = await sock.requestPairingCode(phone);
+      if (!sessionStatus[phone]) sessionStatus[phone] = { status: "connecting" };
       sessionStatus[phone].pairingCode = code;
       sendResponse(res, 200, "Pairing code generated", { pairingCode: code });
     } else {
       sendResponse(res, 200, "Already connected", { status: "connected" });
     }
   } catch (err) {
-    console.error(err);
     sendResponse(res, 500, "Pairing failed", err.message);
   }
 });
@@ -212,7 +346,7 @@ router.post("/broadcast", async (req, res) => {
       try {
         const jid = num.replace(/\D/g, "") + "@s.whatsapp.net";
         await sock.sendMessage(jid, { text: message });
-        await MessageLog.create({ sender, receiver: num, message, status: "sent" });
+        await MessageLog.create({ sender: num, receiver: num, message, status: "sent" });
 
         const [stat] = await Stat.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
         await stat.increment('totalMessagesSent');
@@ -243,34 +377,6 @@ router.get("/campaigns", async (req, res) => {
   try {
     const campaigns = await Campaign.findAll({ where: { sender: req.userNumber }, order: [['createdAt', 'DESC']] });
     sendResponse(res, 200, "Campaigns fetched", campaigns);
-  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
-});
-
-router.post("/template", async (req, res) => {
-  try {
-    const [template] = await Template.upsert({ ...req.body, keyword: req.body.keyword.toLowerCase() });
-    sendResponse(res, 200, "Template saved", template);
-  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
-});
-
-router.get("/templates", async (req, res) => {
-  try {
-    const templates = await Template.findAll();
-    sendResponse(res, 200, "Templates fetched", templates);
-  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
-});
-
-router.get("/plans", async (req, res) => {
-  try {
-    const plans = await Plan.findAll();
-    sendResponse(res, 200, "Plans fetched", plans);
-  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
-});
-
-router.get("/message-logs", async (req, res) => {
-  try {
-    const logs = await MessageLog.findAll({ where: { sender: req.userNumber }, order: [['timestamp', 'DESC']] });
-    sendResponse(res, 200, "Logs fetched", logs);
   } catch (err) { sendResponse(res, 500, "Failed", err.message); }
 });
 
