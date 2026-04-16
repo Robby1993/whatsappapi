@@ -14,7 +14,7 @@ const User = sequelize.define("User", {
     defaultValue: "user"
   },
   validDays: { type: DataTypes.INTEGER, defaultValue: 3 },
-  isActive: { type: Boolean, defaultValue: true },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
   webhookUrl: { type: DataTypes.STRING, allowNull: true },
 
   createdAt: {
