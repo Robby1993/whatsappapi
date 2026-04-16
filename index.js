@@ -33,9 +33,23 @@ async function init() {
     await sequelize.authenticate();
     console.log("✅ PostgreSQL Connected Successfully");
 
-    // Sync database models (creates tables if they don't exist)
-    await sequelize.sync({ alter: true });
-    console.log("💾 Database Synced");
+    // Manually drop the old unique constraint on 'number' if it exists
+    // This allows same number for different user types without losing data
+    /*try {
+      await sequelize.query('ALTER TABLE "Users" DROP CONSTRAINT IF EXISTS "Users_number_key"');
+      await sequelize.query('ALTER TABLE "Users" DROP CONSTRAINT IF EXISTS "Users_number_key11"');
+      console.log("🛠  Cleaned up old unique constraints.");
+    } catch (e) {
+      console.log("⚠️  Note: No old constraints found or already removed.");
+    }
+*/
+    /**
+     * DATABASE SYNC LOGIC
+     */
+    const FORCE_REBUILD = false;
+
+    await sequelize.sync({ force: FORCE_REBUILD, alter: !FORCE_REBUILD });
+    console.log(`💾 Database Synced (Force: ${FORCE_REBUILD})`);
 
     // Start Workers
     schedulerWorker(sessions, sessionStatus, startSession);
@@ -60,9 +74,6 @@ async function init() {
     });
   } catch (err) {
     console.error("❌ PostgreSQL Connection Error:", err.message);
-    if (err.message.includes("ECONNREFUSED")) {
-       console.log("👉 ACTION: Make sure your PostgreSQL server is running and the credentials in .env are correct.");
-    }
     process.exit(1);
   }
 }
