@@ -18,7 +18,7 @@ const ScheduledMessage = require("../models/ScheduledMessage");
 const QueuedMessage = require("../models/QueuedMessage");
 const User = require("../models/User");
 const ChatFlow = require("../models/ChatFlow");
-const { authenticate, sendResponse } = require("../middleware/auth");
+const { authenticate, sendResponse, adminOnly } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -46,7 +46,8 @@ function sessionFolder(phone) {
 }
 
 function sessionExists(phone) {
-  return fs.existsSync(path.join(sessionFolder(phone), "creds.json"));
+  const folder = sessionFolder(phone);
+  return fs.existsSync(path.join(folder, "creds.json"));
 }
 
 async function forceLogoutWhatsApp(phone) {
@@ -74,15 +75,22 @@ async function handleIncomingMessage(phone, m) {
     const msg = m.messages[0];
     if (msg.key.fromMe) return;
 
-    const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
+    const text = (
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.buttonsResponseMessage?.selectedDisplayText ||
+        msg.message?.listResponseMessage?.title ||
+        msg.message?.templateButtonReplyMessage?.selectedId ||
+        ""
+    ).toLowerCase().trim();
+
     const sender = msg.key.remoteJid;
 
-    // 1. Dynamic ChatFlow (Auto Reply)
     if (text) {
       const flow = await ChatFlow.findOne({
         where: {
           userNumber: phone,
-          triggerKeyword: text.toLowerCase().trim(),
+          triggerKeyword: text,
           isActive: true
         }
       });
@@ -121,7 +129,6 @@ async function handleIncomingMessage(phone, m) {
       }
     }
 
-    // 2. Webhook Notifications
     const user = await User.findOne({ where: { number: phone } });
     const admin = await User.findOne({ where: { userType: "admin" } });
 
@@ -129,7 +136,7 @@ async function handleIncomingMessage(phone, m) {
       phone,
       sender,
       pushName: msg.pushName,
-      message: text || "Media Message",
+      message: msg.message?.conversation || msg.message?.extendedTextMessage?.text || "Interaction",
       timestamp: msg.messageTimestamp,
       raw: msg
     };
@@ -143,6 +150,11 @@ async function handleIncomingMessage(phone, m) {
 }
 
 async function initWhatsApp(phone) {
+  // If already connected and socket is open, don't re-init
+  if (sessions[phone] && sessions[phone].ws?.readyState === 1 && sessionStatus[phone]?.status === "connected") {
+    return sessions[phone];
+  }
+
   const folder = sessionFolder(phone);
   if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
 
@@ -166,10 +178,11 @@ async function initWhatsApp(phone) {
 
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
     if (!sessionStatus[phone]) sessionStatus[phone] = { status: "connecting" };
+
     if (qr) sessionStatus[phone].qr = qr;
 
     if (connection === "open") {
-      sessionStatus[phone].status = "connected";
+      sessionStatus[phone] = { status: "connected" };
       console.log(`✅ WhatsApp Connected: ${phone}`);
     }
 
@@ -192,80 +205,25 @@ async function initWhatsApp(phone) {
 }
 
 async function startSession(phone) {
-  if (!sessionExists(phone)) return;
-  return await initWhatsApp(phone);
+  const cleanPhone = phone.toString().replace(/\D/g, "");
+  if (!cleanPhone) return;
+  if (!sessionExists(cleanPhone)) return;
+  return await initWhatsApp(cleanPhone);
 }
 
 router.use(authenticate);
 
-// --- CHATFLOW APIS ---
-
-/**
- * @api {post} /whatsapp/chatflows Create ChatFlow
- * @body {String} triggerKeyword, {String} responseType (text|image|video|audio|document|buttons|list), {String} responseText, {String} mediaUrl, {Array} buttons, {Array} sections, {String} footer, {String} header, {Boolean} isActive
- */
-router.post("/chatflows", async (req, res) => {
-  try {
-    const flow = await ChatFlow.create({ ...req.body, userNumber: req.userNumber });
-    sendResponse(res, 201, "ChatFlow created", flow);
-  } catch (err) { sendResponse(res, 500, "Failed to create ChatFlow", err.message); }
-});
-
-/**
- * @api {get} /whatsapp/chatflows List ChatFlows
- */
-router.get("/chatflows", async (req, res) => {
-  try {
-    const flows = await ChatFlow.findAll({ where: { userNumber: req.userNumber } });
-    sendResponse(res, 200, "ChatFlows fetched", flows);
-  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
-});
-
-/**
- * @api {put} /whatsapp/chatflows/:id Update ChatFlow
- */
-router.put("/chatflows/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const flow = await ChatFlow.findOne({ where: { id, userNumber: req.userNumber } });
-    if (!flow) return sendResponse(res, 404, "ChatFlow not found");
-
-    await flow.update(req.body);
-    sendResponse(res, 200, "ChatFlow updated", flow);
-  } catch (err) { sendResponse(res, 500, "Update failed", err.message); }
-});
-
-/**
- * @api {delete} /whatsapp/chatflows/:id Delete ChatFlow
- */
-router.delete("/chatflows/:id", async (req, res) => {
-  try {
-    await ChatFlow.destroy({ where: { id: req.params.id, userNumber: req.userNumber } });
-    sendResponse(res, 200, "ChatFlow deleted");
-  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
-});
-
-// --- REMAINING APIS ---
-
-router.post("/set-webhook", async (req, res) => {
-  try {
-    const { webhookUrl } = req.body;
-    await User.update({ webhookUrl }, { where: { number: req.userNumber } });
-    sendResponse(res, 200, "Webhook URL updated successfully");
-  } catch (err) {
-    sendResponse(res, 500, "Failed to update webhook", err.message);
-  }
-});
+// --- WHATSAPP CONNECTION APIS ---
 
 router.post("/connect-pair", async (req, res) => {
   try {
     const rawPhone = req.body.phone || req.userNumber;
-    const phone = rawPhone.replace(/\D/g, "");
+    const phone = rawPhone.toString().replace(/\D/g, "");
 
     await forceLogoutWhatsApp(phone);
     const sock = await initWhatsApp(phone);
 
-    await delay(3000);
+    await delay(5000);
 
     if (!sock.authState.creds.registered) {
       const code = await sock.requestPairingCode(phone);
@@ -282,7 +240,7 @@ router.post("/connect-pair", async (req, res) => {
 
 router.post("/connect-qr", async (req, res) => {
   try {
-    const phone = (req.body.phone || req.userNumber).replace(/\D/g, "");
+    const phone = (req.body.phone || req.userNumber).toString().replace(/\D/g, "");
     await forceLogoutWhatsApp(phone);
     await initWhatsApp(phone);
 
@@ -292,7 +250,7 @@ router.post("/connect-qr", async (req, res) => {
       if (sessionStatus[phone]?.qr) {
         clearInterval(checkQR);
         sendResponse(res, 200, "QR generated", { qr: sessionStatus[phone].qr });
-      } else if (attempts > 20) {
+      } else if (attempts > 30) {
         clearInterval(checkQR);
         if (!res.headersSent) sendResponse(res, 408, "QR Timeout");
       }
@@ -302,15 +260,98 @@ router.post("/connect-qr", async (req, res) => {
   }
 });
 
+/**
+ * FIXED: session-status API
+ */
 router.get("/session-status", async (req, res) => {
-  const phone = (req.query.phone || req.userNumber).replace(/\D/g, "");
-  sendResponse(res, 200, "Status fetched", sessionStatus[phone] || { status: "not_connected" });
+  try {
+    const rawPhone = req.query.phone || req.userNumber;
+    if (!rawPhone) {
+      return sendResponse(res, 400, "Phone number required");
+    }
+
+    const phone = rawPhone.toString().replace(/\D/g, "");
+
+    // 1. Check in-memory status
+    let status = sessionStatus[phone];
+
+    // 2. If not in memory, but session folder exists, it might have died or server restarted
+    if (!status && sessionExists(phone)) {
+      console.log(`🔄 Session found for ${phone}, restoring...`);
+      startSession(phone); // Start async
+      return sendResponse(res, 200, "Session is restoring", { status: "restoring", phone });
+    }
+
+    if (!status) {
+      return sendResponse(res, 200, "Session not found", { status: "not_connected", phone });
+    }
+
+    // 3. Final verification if marked as connected
+    if (status.status === "connected") {
+      const sock = sessions[phone];
+      if (!sock || sock.ws?.readyState !== 1) {
+        status.status = "disconnected";
+      }
+    }
+
+    sendResponse(res, 200, "Status fetched", { ...status, phone });
+  } catch (err) {
+    sendResponse(res, 500, "Failed to get status", err.message);
+  }
+});
+
+/**
+ * ADMIN ONLY: List all current sessions
+ */
+router.get("/sessions", adminOnly, async (req, res) => {
+  sendResponse(res, 200, "Active sessions list", sessionStatus);
+});
+
+// --- MESSAGING & CHATFLOW APIS ---
+
+router.post("/chatflows", async (req, res) => {
+  try {
+    const flow = await ChatFlow.create({ ...req.body, userNumber: req.userNumber });
+    sendResponse(res, 201, "ChatFlow created", flow);
+  } catch (err) { sendResponse(res, 500, "Failed to create ChatFlow", err.message); }
+});
+
+router.get("/chatflows", async (req, res) => {
+  try {
+    const flows = await ChatFlow.findAll({ where: { userNumber: req.userNumber } });
+    sendResponse(res, 200, "ChatFlows fetched", flows);
+  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
+});
+
+router.put("/chatflows/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const flow = await ChatFlow.findOne({ where: { id, userNumber: req.userNumber } });
+    if (!flow) return sendResponse(res, 404, "ChatFlow not found");
+    await flow.update(req.body);
+    sendResponse(res, 200, "ChatFlow updated", flow);
+  } catch (err) { sendResponse(res, 500, "Update failed", err.message); }
+});
+
+router.delete("/chatflows/:id", async (req, res) => {
+  try {
+    await ChatFlow.destroy({ where: { id: req.params.id, userNumber: req.userNumber } });
+    sendResponse(res, 200, "ChatFlow deleted");
+  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
+});
+
+router.post("/set-webhook", async (req, res) => {
+  try {
+    const { webhookUrl } = req.body;
+    await User.update({ webhookUrl }, { where: { number: req.userNumber } });
+    sendResponse(res, 200, "Webhook URL updated successfully");
+  } catch (err) { sendResponse(res, 500, "Failed to update webhook", err.message); }
 });
 
 router.post("/send-message", async (req, res) => {
   try {
     const { phone, message, from } = req.body;
-    const sender = (from || req.userNumber).replace(/\D/g, "");
+    const sender = (from || req.userNumber).toString().replace(/\D/g, "");
     const sock = sessions[sender];
 
     if (!sock || sessionStatus[sender]?.status !== "connected") {
@@ -321,20 +362,17 @@ router.post("/send-message", async (req, res) => {
     const result = await sock.sendMessage(jid, { text: message });
 
     await MessageLog.create({ sender, receiver: phone, message, status: "sent" });
-
     const [stat] = await Stat.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
     await stat.increment('totalMessagesSent');
 
     sendResponse(res, 200, "Message sent successfully", result);
-  } catch (err) {
-    sendResponse(res, 500, "Failed", err.message);
-  }
+  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
 });
 
 router.post("/broadcast", async (req, res) => {
   try {
     const { numbers, message, from } = req.body;
-    const sender = (from || req.userNumber).replace(/\D/g, "");
+    const sender = (from || req.userNumber).toString().replace(/\D/g, "");
     const sock = sessions[sender];
 
     if (!sock || sessionStatus[sender]?.status !== "connected") {
@@ -344,26 +382,22 @@ router.post("/broadcast", async (req, res) => {
     const results = [];
     for (const num of numbers) {
       try {
-        const jid = num.replace(/\D/g, "") + "@s.whatsapp.net";
+        const jid = num.toString().replace(/\D/g, "") + "@s.whatsapp.net";
         await sock.sendMessage(jid, { text: message });
-        await MessageLog.create({ sender: num, receiver: num, message, status: "sent" });
-
+        await MessageLog.create({ sender, receiver: num, message, status: "sent" });
         const [stat] = await Stat.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
         await stat.increment('totalMessagesSent');
-
         results.push({ number: num, status: "sent" });
         await delay(1000);
       } catch (e) { results.push({ number: num, status: "failed", error: e.message }); }
     }
     sendResponse(res, 200, "Broadcast processed", { total: numbers.length, results });
-  } catch (err) {
-    sendResponse(res, 500, "Failed", err.message);
-  }
+  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
 });
 
 router.post("/create-campaign", async (req, res) => {
   try {
-    const sender = req.body.from || req.userNumber;
+    const sender = (req.body.from || req.userNumber).toString().replace(/\D/g, "");
     const { name, message, numbers } = req.body;
     if (!name || !message || !numbers) return sendResponse(res, 400, "Fields missing");
     const campaign = await Campaign.create({ name, sender, message, totalContacts: numbers.length });
@@ -382,12 +416,10 @@ router.get("/campaigns", async (req, res) => {
 
 router.post("/logout", async (req, res) => {
   try {
-    const phone = (req.body.phone || req.userNumber).replace(/\D/g, "");
+    const phone = (req.body.phone || req.userNumber).toString().replace(/\D/g, "");
     await forceLogoutWhatsApp(phone);
     sendResponse(res, 200, "Logged out successfully");
-  } catch (err) {
-    sendResponse(res, 500, "Logout failed", err.message);
-  }
+  } catch (err) { sendResponse(res, 500, "Logout failed", err.message); }
 });
 
 module.exports = { router, startSession, sessions, sessionStatus };
