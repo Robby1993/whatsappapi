@@ -161,10 +161,11 @@ async function initWhatsApp(phone) {
     version,
     auth: state,
     printQRInTerminal: false,
-    browser: Browsers.windows("Desktop"),
+    browser: Browsers.ubuntu("Chrome"),
     syncFullHistory: false,
     shouldSyncHistoryMessage: () => false,
-    connectTimeoutMs: 60000
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 0
   });
 
   sessions[phone] = sock;
