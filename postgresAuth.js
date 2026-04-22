@@ -1,6 +1,4 @@
-const { proto } = require("@whiskeysockets/baileys");
-const { Curve, signedKeyPair } = require("@whiskeysockets/baileys/lib/Utils/crypto");
-const { BufferJSON, initAuthCreds } = require("@whiskeysockets/baileys/lib/Utils/auth-utils");
+const { proto, BufferJSON, initAuthCreds } = require("@whiskeysockets/baileys");
 const Session = require("./models/Session");
 
 /**
