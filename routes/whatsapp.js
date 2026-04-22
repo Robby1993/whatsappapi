@@ -4,12 +4,13 @@ const path = require("path");
 const axios = require("axios");
 const {
   default: makeWASocket,
-  useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
   Browsers
 } = require("@whiskeysockets/baileys");
 
+const usePostgresAuthState = require("../postgresAuth");
+const Session = require("../models/Session");
 const MessageLog = require("../models/MessageLog");
 const Stat = require("../models/Stat");
 const Campaign = require("../models/Campaign");
@@ -34,6 +35,7 @@ async function getBaileysVersion() {
       latestBaileysVersion = version;
     } catch (e) {
       latestBaileysVersion = [2, 3000, 1015901307];
+      // latestBaileysVersion = [2, 2413, 1];
     }
   }
   return latestBaileysVersion;
@@ -45,8 +47,11 @@ function sessionFolder(phone) {
   return path.join(__dirname, "../sessions", phone);
 }
 
-function sessionExists(phone) {
-  return fs.existsSync(path.join(sessionFolder(phone), "creds.json"));
+async function sessionExists(phone) {
+  const session = await Session.findOne({
+    where: { phone, dataType: "creds", dataId: "base" }
+  });
+  return !!session;
 }
 
 async function forceLogoutWhatsApp(phone) {
@@ -62,8 +67,14 @@ async function forceLogoutWhatsApp(phone) {
     delete sessions[phone];
     delete sessionStatus[phone];
   }
+
+  // Delete from Database
+  await Session.destroy({ where: { phone } });
+
+  // Delete from Filesystem (Legacy)
   const folder = sessionFolder(phone);
   if (fs.existsSync(folder)) fs.rmSync(folder, { recursive: true, force: true });
+
   await delay(1000);
   delete loggingOut[phone];
 }
@@ -143,17 +154,14 @@ async function handleIncomingMessage(phone, m) {
 }
 
 async function initWhatsApp(phone) {
-  const folder = sessionFolder(phone);
-  if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
-
-  const { state, saveCreds } = await useMultiFileAuthState(folder);
+  const { state, saveCreds } = await usePostgresAuthState(phone);
   const version = await getBaileysVersion();
 
   const sock = makeWASocket({
     version,
     auth: state,
     printQRInTerminal: false,
-    browser: Browsers.ubuntu("Chrome"),
+    browser: Browsers.windows("Desktop"),
     syncFullHistory: false,
     shouldSyncHistoryMessage: () => false,
     connectTimeoutMs: 60000
@@ -178,7 +186,7 @@ async function initWhatsApp(phone) {
       if (reason === DisconnectReason.loggedOut) {
         delete sessions[phone];
         delete sessionStatus[phone];
-        if (fs.existsSync(folder)) fs.rmSync(folder, { recursive: true, force: true });
+        Session.destroy({ where: { phone } }).catch(() => {});
       } else if (!loggingOut[phone]) {
         sessionStatus[phone].status = "disconnected";
         setTimeout(() => initWhatsApp(phone), 5000);
@@ -192,7 +200,7 @@ async function initWhatsApp(phone) {
 }
 
 async function startSession(phone) {
-  if (!sessionExists(phone)) return;
+  if (!(await sessionExists(phone))) return;
   return await initWhatsApp(phone);
 }
 
