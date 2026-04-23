@@ -52,7 +52,7 @@ async function init() {
     /**
      * DATABASE SYNC LOGIC
      */
-    const FORCE_REBUILD = true;
+    const FORCE_REBUILD = false;
 
     await sequelize.sync({ force: FORCE_REBUILD, alter: !FORCE_REBUILD });
     console.log(`💾 Database Synced (Force: ${FORCE_REBUILD})`);

@@ -39,8 +39,8 @@ async function init() {
     await sequelize.authenticate();
     console.log("✅ PostgreSQL Connected Successfully");
 
-    await sequelize.sync({ force: true });
-    console.log("💾 Database Synced (Forced Rebuild)");
+    await sequelize.sync({ alter: true });
+    console.log("💾 Database Synced (Alter Mode)");
 
     // Start Workers
     schedulerWorker(sessions, sessionStatus, startSession);

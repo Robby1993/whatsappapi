@@ -18,8 +18,22 @@ class MessageController {
       const message = await MessagingService.send({
         channel: "rcs", sender: "SYSTEM", receiver, type: type || "text", content, metadata
       });
+
+      // Special handling for simulated mode (missing keys)
+      if (message.status === "simulated") {
+        return res.status(200).json({
+          status: true,
+          message: "Simulated: No google-key.json found. Payload logged to console.",
+          warning: "Real RCS message was NOT sent. Register Google Key first.",
+          data: message
+        });
+      }
+
       res.status(200).json({ status: true, message: "RCS Message sent", data: message });
-    } catch (error) { res.status(500).json({ status: false, error: error.message }); }
+    } catch (error) {
+      // Return clear error if Google API fails (e.g. test device not registered)
+      res.status(400).json({ status: false, error: error.message });
+    }
   }
 
   async getStatus(req, res) {
