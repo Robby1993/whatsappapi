@@ -94,6 +94,24 @@ async function init() {
         console.error("❌ Failed to restore sessions:", e.message);
       }
     });
+
+    // --- GRACEFUL SHUTDOWN ---
+    const shutdown = async (signal) => {
+      console.log(`\n🛑 Received ${signal}, closing sessions...`);
+      for (const phone in sessions) {
+        try {
+          if (sessions[phone].ws?.readyState === 1) {
+            await sessions[phone].end();
+          }
+        } catch (e) {}
+      }
+      console.log("✅ Sessions closed, exiting.");
+      process.exit(0);
+    };
+
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+
   } catch (err) {
     console.error("❌ PostgreSQL Connection Error:", err.message);
     process.exit(1);
