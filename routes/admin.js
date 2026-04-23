@@ -37,6 +37,23 @@ router.get("/dashboard", authenticate, async (req, res) => {
 // --- ADMIN ONLY ROUTES ---
 router.use(authenticate, adminOnly);
 
+const crypto = require("crypto");
+
+/**
+ * Generate API Key for a user
+ */
+router.post("/users/:number/generate-api-key", async (req, res) => {
+  try {
+    const { number } = req.params;
+    const apiKey = "wa_" + crypto.randomBytes(32).toString("hex");
+
+    const [updated] = await User.update({ apiKey }, { where: { number } });
+    if (!updated) return sendResponse(res, 404, "User not found");
+
+    sendResponse(res, 200, "API Key generated successfully", { number, apiKey });
+  } catch (err) { sendResponse(res, 500, "Failed to generate API Key", err.message); }
+});
+
 /**
  * Global System Stats
  */

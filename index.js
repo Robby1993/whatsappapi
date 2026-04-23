@@ -10,6 +10,7 @@ const Session = require("./models/Session");
 const authRoutes = require("./routes/auth");
 const { router: whatsappRoutes, startSession, sessions, sessionStatus } = require("./routes/whatsapp");
 const adminRoutes = require("./routes/admin");
+const messagingRoutes = require("./src/routes/messaging");
 
 const schedulerWorker = require("./workers/scheduler");
 const queueWorker = require("./workers/queue");
@@ -25,6 +26,7 @@ const PORT = process.env.PORT || 3000;
 app.use("/auth", authRoutes);
 app.use("/whatsapp", whatsappRoutes);
 app.use("/admin", adminRoutes);
+app.use("/api/v1", messagingRoutes);
 
 // Startup
 async function init() {

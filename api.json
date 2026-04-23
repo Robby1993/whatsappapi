@@ -1,0 +1,375 @@
+{
+	"info": {
+		"_postman_id": "omnichannel-messaging-v1-comprehensive",
+		"name": "Omnichannel Messaging API - ALL ENDPOINTS",
+		"description": "Comprehensive Postman collection for the Omnichannel Messaging API, including WhatsApp, RCS, ChatFlow, User Management, and Admin tools.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test User\",\n    \"number\": \"918866813729\",\n    \"password\": \"password123\",\n    \"userType\": \"user\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
+					}
+				},
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"number\": \"918866813729\",\n    \"password\": \"password123\",\n    \"userType\": \"user\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+					}
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"number\": \"918866813729\",\n    \"userType\": \"user\",\n    \"newPassword\": \"new_secret_pass\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/auth/forgot-password", "host": ["{{base_url}}"], "path": ["auth", "forgot-password"] }
+					}
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Name\",\n    \"gender\": \"Male\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/auth/update-profile", "host": ["{{base_url}}"], "path": ["auth", "update-profile"] }
+					}
+				},
+				{
+					"name": "Buy Subscription",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"planId\": \"plan_standard_30\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/auth/buy-subscription", "host": ["{{base_url}}"], "path": ["auth", "buy-subscription"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Omnichannel API (API Key)",
+			"item": [
+				{
+					"name": "WhatsApp - Send Text",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"receiver\": \"918866813729\",\n    \"content\": \"Hello via API Key!\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/v1/whatsapp/send", "host": ["{{base_url}}"], "path": ["api", "v1", "whatsapp", "send"] }
+					}
+				},
+				{
+					"name": "WhatsApp - Send Media",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"receiver\": \"918866813729\",\n    \"type\": \"image\",\n    \"content\": \"https://picsum.photos/500\",\n    \"metadata\": { \"caption\": \"Sent via Omnichannel V1\" }\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/v1/whatsapp/send", "host": ["{{base_url}}"], "path": ["api", "v1", "whatsapp", "send"] }
+					}
+				},
+				{
+					"name": "RCS - Send Text",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"receiver\": \"+918866813729\",\n    \"content\": \"Hello via RCS API!\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/v1/rcs/send", "host": ["{{base_url}}"], "path": ["api", "v1", "rcs", "send"] }
+					}
+				},
+				{
+					"name": "RCS - Rich Card",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"receiver\": \"+918866813729\",\n    \"metadata\": {\n        \"richCard\": {\n            \"standaloneCard\": {\n                \"cardContent\": {\n                    \"title\": \"Omnichannel Title\",\n                    \"description\": \"Interactive RCS card.\",\n                    \"media\": { \"height\": \"MEDIUM\", \"contentInfo\": { \"fileUrl\": \"https://picsum.photos/500\" } }\n                }\n            }\n        }\n    }\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/v1/rcs/rich-card", "host": ["{{base_url}}"], "path": ["api", "v1", "rcs", "rich-card"] }
+					}
+				},
+				{
+					"name": "Broadcast (Multi-channel)",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"channel\": \"whatsapp\",\n    \"receivers\": [\"918866813729\", \"919988776655\"],\n    \"content\": \"Testing Omnichannel Broadcast\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/api/v1/broadcast", "host": ["{{base_url}}"], "path": ["api", "v1", "broadcast"] }
+					}
+				},
+				{
+					"name": "Get Message Status",
+					"request": {
+						"method": "GET",
+						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
+						"url": { "raw": "{{base_url}}/api/v1/message/status/PASTE_MESSAGE_ID_HERE", "host": ["{{base_url}}"], "path": ["api", "v1", "message", "status", "PASTE_MESSAGE_ID_HERE"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "3. WhatsApp Device Management",
+			"item": [
+				{
+					"name": "Connect QR",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/whatsapp/connect-qr", "host": ["{{base_url}}"], "path": ["whatsapp", "connect-qr"] }
+					}
+				},
+				{
+					"name": "Connect Pairing Code",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/whatsapp/connect-pair", "host": ["{{base_url}}"], "path": ["whatsapp", "connect-pair"] }
+					}
+				},
+				{
+					"name": "Session Status",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/whatsapp/session-status", "host": ["{{base_url}}"], "path": ["whatsapp", "session-status"] }
+					}
+				},
+				{
+					"name": "Logout Device",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phone\": \"918866813729\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/whatsapp/logout", "host": ["{{base_url}}"], "path": ["whatsapp", "logout"] }
+					}
+				},
+				{
+					"name": "Set Webhook URL",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"webhookUrl\": \"https://your-server.com/webhook\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/whatsapp/set-webhook", "host": ["{{base_url}}"], "path": ["whatsapp", "set-webhook"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "4. ChatFlow (Auto-Reply)",
+			"item": [
+				{
+					"name": "Create ChatFlow",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"triggerKeyword\": \"price\",\n    \"responseType\": \"text\",\n    \"responseText\": \"Our plans start at $10/month.\",\n    \"isActive\": true\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/whatsapp/chatflows", "host": ["{{base_url}}"], "path": ["whatsapp", "chatflows"] }
+					}
+				},
+				{
+					"name": "List My ChatFlows",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/whatsapp/chatflows", "host": ["{{base_url}}"], "path": ["whatsapp", "chatflows"] }
+					}
+				},
+				{
+					"name": "Update ChatFlow",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "PUT",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"isActive\": false\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/whatsapp/chatflows/1", "host": ["{{base_url}}"], "path": ["whatsapp", "chatflows", "1"] }
+					}
+				},
+				{
+					"name": "Delete ChatFlow",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "DELETE",
+						"url": { "raw": "{{base_url}}/whatsapp/chatflows/1", "host": ["{{base_url}}"], "path": ["whatsapp", "chatflows", "1"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Campaigns & Reports",
+			"item": [
+				{
+					"name": "Create Campaign",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Summer Sale\",\n    \"message\": \"Grab your 20% discount now!\",\n    \"numbers\": [\"918866813729\", \"919988776655\"]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/whatsapp/create-campaign", "host": ["{{base_url}}"], "path": ["whatsapp", "create-campaign"] }
+					}
+				},
+				{
+					"name": "List My Campaigns",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/whatsapp/campaigns", "host": ["{{base_url}}"], "path": ["whatsapp", "campaigns"] }
+					}
+				},
+				{
+					"name": "User Dashboard",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/admin/dashboard", "host": ["{{base_url}}"], "path": ["admin", "dashboard"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Admin Management",
+			"item": [
+				{
+					"name": "Generate API Key",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/admin/users/918866813729/generate-api-key", "host": ["{{base_url}}"], "path": ["admin", "users", "918866813729", "generate-api-key"] }
+					}
+				},
+				{
+					"name": "Global System Stats",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/admin/stats", "host": ["{{base_url}}"], "path": ["admin", "stats"] }
+					}
+				},
+				{
+					"name": "List All Users",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/admin/users", "host": ["{{base_url}}"], "path": ["admin", "users"] }
+					}
+				},
+				{
+					"name": "Update User Status/Days",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"number\": \"918866813729\",\n    \"isActive\": true,\n    \"validDays\": 30\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/admin/update-user", "host": ["{{base_url}}"], "path": ["admin", "update-user"] }
+					}
+				},
+				{
+					"name": "Hard Delete User",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "DELETE",
+						"url": { "raw": "{{base_url}}/admin/users/918866813729/hard", "host": ["{{base_url}}"], "path": ["admin", "users", "918866813729", "hard"] }
+					}
+				},
+				{
+					"name": "Manage Plans (Upsert)",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"id\": \"plan_standard_30\",\n    \"name\": \"Standard 30 Days\",\n    \"days\": 30,\n    \"price\": 100\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/admin/plans", "host": ["{{base_url}}"], "path": ["admin", "plans"] }
+					}
+				},
+				{
+					"name": "Get All System Logs",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/admin/all-logs", "host": ["{{base_url}}"], "path": ["admin", "all-logs"] }
+					}
+				},
+				{
+					"name": "System Cleanup (DANGER)",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/admin/clear-database", "host": ["{{base_url}}"], "path": ["admin", "clear-database"] }
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{ "key": "base_url", "value": "http://localhost:3000" },
+		{ "key": "auth_token", "value": "PASTE_JWT_TOKEN_HERE" },
+		{ "key": "api_key", "value": "PASTE_API_KEY_HERE" }
+	]
+}

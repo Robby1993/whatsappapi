@@ -6,6 +6,11 @@ const User = sequelize.define("User", {
     type: DataTypes.STRING,
     allowNull: false
   },
+  apiKey: {
+    type: DataTypes.STRING,
+    unique: true,
+    allowNull: true
+  },
   name: { type: DataTypes.STRING, defaultValue: "User" },
   gender: { type: DataTypes.STRING, defaultValue: "Not Specified" },
   password: { type: DataTypes.STRING, allowNull: false },

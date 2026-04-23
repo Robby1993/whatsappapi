@@ -35,6 +35,7 @@ router.post("/register", async (req, res) => {
 
     const newUser = await User.create({
       number: cleanNumber,
+      apiKey: "wa_" + crypto.randomBytes(32).toString("hex"),
       name: name || "User",
       gender: gender || "Not Specified",
       password,
