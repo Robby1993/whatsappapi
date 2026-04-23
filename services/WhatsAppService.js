@@ -1,5 +1,5 @@
-const { sessions, sessionStatus, startSession } = require("../../routes/whatsapp");
-const Message = require("../../models/Message");
+const { sessions, sessionStatus } = require("../routes/whatsapp");
+const Message = require("../models/Message");
 
 class WhatsAppService {
   async sendMessage(sender, receiver, type, content, metadata = {}) {

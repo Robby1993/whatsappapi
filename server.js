@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 
 const sequelize = require("./db");
 const User = require("./models/User");
@@ -9,6 +10,7 @@ const Session = require("./models/Session");
 const authRoutes = require("./routes/auth");
 const { router: whatsappRoutes, startSession, sessions, sessionStatus } = require("./routes/whatsapp");
 const adminRoutes = require("./routes/admin");
+const messagingRoutes = require("./routes/messaging");
 
 const schedulerWorker = require("./workers/scheduler");
 const queueWorker = require("./workers/queue");
@@ -24,6 +26,10 @@ const PORT = process.env.PORT || 3000;
 app.use("/auth", authRoutes);
 app.use("/whatsapp", whatsappRoutes);
 app.use("/admin", adminRoutes);
+app.use("/api/v1", messagingRoutes);
+
+// Test Route to verify server is active
+app.get("/ping", (req, res) => res.send("pong"));
 
 // Startup
 async function init() {
@@ -33,9 +39,8 @@ async function init() {
     await sequelize.authenticate();
     console.log("✅ PostgreSQL Connected Successfully");
 
-    // Sync database models (creates tables if they don't exist)
-    await sequelize.sync({ alter: true });
-    console.log("💾 Database Synced");
+    await sequelize.sync({ force: true });
+    console.log("💾 Database Synced (Forced Rebuild)");
 
     // Start Workers
     schedulerWorker(sessions, sessionStatus, startSession);
@@ -60,9 +65,6 @@ async function init() {
     });
   } catch (err) {
     console.error("❌ PostgreSQL Connection Error:", err.message);
-    if (err.message.includes("ECONNREFUSED")) {
-       console.log("👉 ACTION: Make sure your PostgreSQL server is running and the credentials in .env are correct.");
-    }
     process.exit(1);
   }
 }

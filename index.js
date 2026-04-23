@@ -10,7 +10,7 @@ const Session = require("./models/Session");
 const authRoutes = require("./routes/auth");
 const { router: whatsappRoutes, startSession, sessions, sessionStatus } = require("./routes/whatsapp");
 const adminRoutes = require("./routes/admin");
-const messagingRoutes = require("./src/routes/messaging");
+const messagingRoutes = require("./routes/messaging");
 
 const schedulerWorker = require("./workers/scheduler");
 const queueWorker = require("./workers/queue");
@@ -27,6 +27,9 @@ app.use("/auth", authRoutes);
 app.use("/whatsapp", whatsappRoutes);
 app.use("/admin", adminRoutes);
 app.use("/api/v1", messagingRoutes);
+
+// Test Route to verify server is active
+app.get("/ping", (req, res) => res.send("pong"));
 
 // Startup
 async function init() {
@@ -49,7 +52,7 @@ async function init() {
     /**
      * DATABASE SYNC LOGIC
      */
-    const FORCE_REBUILD = false;
+    const FORCE_REBUILD = true;
 
     await sequelize.sync({ force: FORCE_REBUILD, alter: !FORCE_REBUILD });
     console.log(`💾 Database Synced (Force: ${FORCE_REBUILD})`);

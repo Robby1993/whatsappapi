@@ -3,15 +3,15 @@ const sequelize = require("../db");
 
 const Message = sequelize.define("Message", {
   id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-  externalId: { type: DataTypes.STRING }, // ID from Baileys or RCS
+  externalId: { type: DataTypes.STRING },
   sender: { type: DataTypes.STRING, allowNull: false },
   receiver: { type: DataTypes.STRING, allowNull: false },
-  channel: { type: DataTypes.ENUM("whatsapp", "rcs"), allowNull: false },
-  type: { type: DataTypes.STRING, defaultValue: "text" }, // text, image, video, document, rich_card
+  channel: { type: DataTypes.STRING, allowNull: false }, // Use STRING for flexibility (whatsapp, rcs, etc.)
+  type: { type: DataTypes.STRING, defaultValue: "text" },
   content: { type: DataTypes.TEXT },
-  status: { type: DataTypes.ENUM("pending", "sent", "delivered", "read", "failed"), defaultValue: "pending" },
+  status: { type: DataTypes.STRING, defaultValue: "pending" }, // Use STRING to avoid ENUM sync issues
   errorMessage: { type: DataTypes.STRING },
-  metadata: { type: DataTypes.JSONB } // For storing buttons or card data
+  metadata: { type: DataTypes.JSONB }
 }, { timestamps: true });
 
 module.exports = Message;

@@ -86,6 +86,12 @@ router.post("/login", async (req, res) => {
       return sendResponse(res, 403, "Account is currently inactive");
     }
 
+    // Ensure user has an API Key
+    if (!user.apiKey) {
+      user.apiKey = "wa_" + crypto.randomBytes(32).toString("hex");
+      await user.save();
+    }
+
     // Generate session token
     const token = crypto.randomBytes(24).toString('hex');
     await Token.create({
