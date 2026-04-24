@@ -11,7 +11,8 @@ const Message = sequelize.define("Message", {
   content: { type: DataTypes.TEXT },
   status: { type: DataTypes.STRING, defaultValue: "pending" }, // Use STRING to avoid ENUM sync issues
   errorMessage: { type: DataTypes.STRING },
-  metadata: { type: DataTypes.JSONB }
-}, { timestamps: true });
+  metadata: { type: DataTypes.JSONB },
+  createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, { timestamps: false });
 
 module.exports = Message;

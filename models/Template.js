@@ -10,9 +10,10 @@ const Template = sequelize.define("Template", {
   header: { type: DataTypes.STRING, defaultValue: "" },
   sections: { type: DataTypes.JSONB, defaultValue: [] },
   mediaUrl: { type: DataTypes.STRING, defaultValue: "" },
-  fileName: { type: DataTypes.STRING, defaultValue: "" }
+  fileName: { type: DataTypes.STRING, defaultValue: "" },
+  createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 }, {
-  timestamps: true
+  timestamps: false
 });
 
 module.exports = Template;
