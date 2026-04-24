@@ -171,19 +171,39 @@ class FlowEngine {
             await sock.sendMessage(remoteJid, { image: { url: data.url }, caption: data.caption });
             break;
           case "buttons":
-            const buttons = data.buttons.map(b => ({
-              buttonId: String(b.id),
-              buttonText: { displayText: b.title },
+            const buttons = (data.buttons || []).map(b => ({
+              buttonId: String(b.id || Math.random().toString(36).substring(7)),
+              buttonText: { displayText: b.title || "Button" },
               type: 1
             }));
-            await sock.sendMessage(remoteJid, { text: data.text || "Select:", buttons, headerType: 1 });
+
+            // Modern Baileys structure for buttons
+            await sock.sendMessage(remoteJid, {
+              text: data.text || "Please choose an option:",
+              footer: data.footer || "Powered by Omnichannel",
+              buttons: buttons,
+              headerType: 1,
+              viewOnce: true // Required by some WhatsApp versions for reliability
+            });
             break;
           case "list":
+            // Ensure sections have rows
+            const sections = (data.sections || []).map(s => ({
+                title: s.title || "Options",
+                rows: (s.rows || []).map(r => ({
+                    title: r.title || "Select",
+                    rowId: String(r.id || r.rowId),
+                    description: r.description || ""
+                }))
+            }));
+
             await sock.sendMessage(remoteJid, {
-              text: data.text || "Select:",
-              title: data.title,
-              buttonText: data.buttonText || "Options",
-              sections: data.sections
+              text: data.text || "Please select from the menu:",
+              title: data.title || "Menu",
+              footer: data.footer || "Powered by Omnichannel",
+              buttonText: data.buttonText || "View Options",
+              sections: sections,
+              viewOnce: true
             });
             break;
         }
