@@ -7,9 +7,6 @@ const fs = require("fs");
 const sequelize = require("./db");
 const User = require("./models/User");
 const Session = require("./models/Session");
-const Flow = require("./models/Flow");
-const FlowNode = require("./models/FlowNode");
-const FlowSession = require("./models/FlowSession");
 const authRoutes = require("./routes/auth");
 const { router: whatsappRoutes, startSession, sessions, sessionStatus } = require("./routes/whatsapp");
 const adminRoutes = require("./routes/admin");
@@ -26,15 +23,15 @@ app.use(cors());
 // prioritize .env values
 const PORT = process.env.PORT || 3000;
 
+// Test Route to verify server is active
+app.get("/ping", (req, res) => res.send("pong"));
+
 // Routes
 app.use("/auth", authRoutes);
 app.use("/whatsapp", whatsappRoutes);
 app.use("/admin", adminRoutes);
 app.use("/api/v1", messagingRoutes);
 app.use("/flows", flowRoutes);
-
-// Test Route to verify server is active
-app.get("/ping", (req, res) => res.send("pong"));
 
 // Startup
 async function init() {
@@ -45,7 +42,7 @@ async function init() {
     console.log("✅ PostgreSQL Connected Successfully");
 
     await sequelize.sync({ alter: true });
-    console.log("💾 Database Synced (Alter Mode)");
+    console.log("💾 Database Synced");
 
     // Start Workers
     schedulerWorker(sessions, sessionStatus, startSession);
@@ -54,19 +51,13 @@ async function init() {
     app.listen(PORT, "0.0.0.0", async () => {
       console.log(`🚀 Server running on port ${PORT}`);
 
-      // Restore active sessions from PostgreSQL Database
+      // Restore active sessions
       try {
-        const activeSessions = await Session.findAll({
-          where: { dataType: "creds", dataId: "base" }
-        });
-
+        const activeSessions = await Session.findAll({ where: { dataType: "creds", dataId: "base" } });
         for (const session of activeSessions) {
-          console.log(`🔄 Restoring session from DB: ${session.phone}`);
           startSession(session.phone);
         }
-      } catch (e) {
-        console.error("❌ Failed to restore sessions:", e.message);
-      }
+      } catch (e) {}
     });
   } catch (err) {
     console.error("❌ PostgreSQL Connection Error:", err.message);

@@ -7,9 +7,6 @@ const fs = require("fs");
 const sequelize = require("./db");
 const User = require("./models/User");
 const Session = require("./models/Session");
-const Flow = require("./models/Flow");
-const FlowNode = require("./models/FlowNode");
-const FlowSession = require("./models/FlowSession");
 const authRoutes = require("./routes/auth");
 const { router: whatsappRoutes, startSession, sessions, sessionStatus } = require("./routes/whatsapp");
 const adminRoutes = require("./routes/admin");
@@ -26,15 +23,15 @@ app.use(cors());
 // prioritize .env values
 const PORT = process.env.PORT || 3000;
 
+// Test Route to verify server is active
+app.get("/ping", (req, res) => res.send("pong"));
+
 // Routes
 app.use("/auth", authRoutes);
 app.use("/whatsapp", whatsappRoutes);
 app.use("/admin", adminRoutes);
 app.use("/api/v1", messagingRoutes);
 app.use("/flows", flowRoutes);
-
-// Test Route to verify server is active
-app.get("/ping", (req, res) => res.send("pong"));
 
 // Startup
 async function init() {
@@ -44,23 +41,8 @@ async function init() {
     await sequelize.authenticate();
     console.log("✅ PostgreSQL Connected Successfully");
 
-    // Manually drop the old unique constraint on 'number' if it exists
-    // This allows same number for different user types without losing data
-    /*try {
-      await sequelize.query('ALTER TABLE "Users" DROP CONSTRAINT IF EXISTS "Users_number_key"');
-      await sequelize.query('ALTER TABLE "Users" DROP CONSTRAINT IF EXISTS "Users_number_key11"');
-      console.log("🛠  Cleaned up old unique constraints.");
-    } catch (e) {
-      console.log("⚠️  Note: No old constraints found or already removed.");
-    }
-*/
-    /**
-     * DATABASE SYNC LOGIC
-     */
-    const FORCE_REBUILD = false;
-
-    await sequelize.sync({ force: FORCE_REBUILD, alter: !FORCE_REBUILD });
-    console.log(`💾 Database Synced (Force: ${FORCE_REBUILD})`);
+    await sequelize.sync({ alter: true });
+    console.log("💾 Database Synced");
 
     // Start Workers
     schedulerWorker(sessions, sessionStatus, startSession);
@@ -69,7 +51,7 @@ async function init() {
     app.listen(PORT, "0.0.0.0", async () => {
       console.log(`🚀 Server running on port ${PORT}`);
 
-      // 🚚 Auto-migrate filesystem sessions to Database (if any)
+      // 🚚 Auto-migrate filesystem sessions
       try {
         const sessionsDir = path.join(__dirname, "sessions");
         if (fs.existsSync(sessionsDir)) {
@@ -79,30 +61,21 @@ async function init() {
             if (fs.existsSync(credsFile)) {
               const exists = await Session.findOne({ where: { phone, dataType: "creds", dataId: "base" } });
               if (!exists) {
-                console.log(`🚚 Migrating session for ${phone} from filesystem to Database...`);
                 const data = fs.readFileSync(credsFile, "utf-8");
                 await Session.create({ phone, dataType: "creds", dataId: "base", data });
               }
             }
           }
         }
-      } catch (e) {
-        console.error("⚠️ Migration error:", e.message);
-      }
+      } catch (e) {}
 
-      // Restore active sessions from PostgreSQL Database
+      // Restore active sessions
       try {
-        const activeSessions = await Session.findAll({
-          where: { dataType: "creds", dataId: "base" }
-        });
-
+        const activeSessions = await Session.findAll({ where: { dataType: "creds", dataId: "base" } });
         for (const session of activeSessions) {
-          console.log(`🔄 Restoring session from DB: ${session.phone}`);
           startSession(session.phone);
         }
-      } catch (e) {
-        console.error("❌ Failed to restore sessions:", e.message);
-      }
+      } catch (e) {}
     });
   } catch (err) {
     console.error("❌ PostgreSQL Connection Error:", err.message);
