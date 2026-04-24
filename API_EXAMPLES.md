@@ -99,9 +99,30 @@ curl -X GET http://localhost:3000/whatsapp/session-status \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
+## 🤖 Multi-Node Flows (New System)
+**Create Multi-Step Flow**
+```bash
+curl -X POST http://localhost:3000/flows \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Welcome Flow",
+    "trigger": "hi",
+    "nodes": [
+        { "id": "1", "type": "text", "data": { "text": "Hello 👋 Welcome!" }, "next": "2" },
+        { "id": "2", "type": "buttons", "data": { "text": "Choose option", "buttons": [{"id":"order","title":"Order"}, {"id":"support","title":"Support"}]} }
+    ]
+  }'
+```
+
+**List Flows**
+```bash
+curl -X GET http://localhost:3000/flows -H "Authorization: Bearer YOUR_TOKEN"
+```
+
 ---
 
-## 🤖 ChatFlow (Auto-Replies)
+## 🤖 ChatFlow (Old System - Deprecated)
 **Create Keyword Trigger**
 ```bash
 curl -X POST http://localhost:3000/whatsapp/chatflows \

@@ -7,10 +7,14 @@ const fs = require("fs");
 const sequelize = require("./db");
 const User = require("./models/User");
 const Session = require("./models/Session");
+const Flow = require("./models/Flow");
+const FlowNode = require("./models/FlowNode");
+const FlowSession = require("./models/FlowSession");
 const authRoutes = require("./routes/auth");
 const { router: whatsappRoutes, startSession, sessions, sessionStatus } = require("./routes/whatsapp");
 const adminRoutes = require("./routes/admin");
 const messagingRoutes = require("./routes/messaging");
+const flowRoutes = require("./flows/flow.routes");
 
 const schedulerWorker = require("./workers/scheduler");
 const queueWorker = require("./workers/queue");
@@ -27,6 +31,7 @@ app.use("/auth", authRoutes);
 app.use("/whatsapp", whatsappRoutes);
 app.use("/admin", adminRoutes);
 app.use("/api/v1", messagingRoutes);
+app.use("/flows", flowRoutes);
 
 // Test Route to verify server is active
 app.get("/ping", (req, res) => res.send("pong"));

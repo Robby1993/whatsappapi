@@ -20,6 +20,7 @@ const QueuedMessage = require("../models/QueuedMessage");
 const User = require("../models/User");
 const ChatFlow = require("../models/ChatFlow");
 const FlowState = require("../models/FlowState");
+const flowEngine = require("../flows/flow.engine");
 const { authenticate, sendResponse } = require("../middleware/auth");
 
 const router = express.Router();
@@ -95,7 +96,11 @@ async function handleIncomingMessage(phone, m) {
 
     console.log(`📩 [${phone}] Incoming from ${remoteJid}: "${incomingText}"`);
 
-    // --- 1. CHECK ACTIVE FLOW STATE ---
+    // --- 0. NEW FLOW ENGINE (PRIORITY) ---
+    const handledByFlow = await flowEngine.handleIncoming(phone, remoteJid, incomingText);
+    if (handledByFlow) return;
+
+    // --- 1. CHECK ACTIVE FLOW STATE (OLD ENGINE) ---
     let state = await FlowState.findOne({ where: { userNumber: phone, remoteJid } });
 
     if (state) {

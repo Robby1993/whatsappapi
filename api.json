@@ -1,8 +1,8 @@
 {
 	"info": {
-		"_postman_id": "omnichannel-messaging-v1-ultimate",
+		"_postman_id": "omnichannel-messaging-v1-ultimate-v2",
 		"name": "Omnichannel Messaging API - COMPLETE",
-		"description": "The complete Postman collection for the Omnichannel Messaging API. Includes WhatsApp, RCS, Multi-node ChatFlows, Campaigns, User Subscriptions, and full Admin Management.",
+		"description": "Comprehensive Postman collection for the Omnichannel Messaging API. Includes WhatsApp, RCS, Multi-node Flows, Campaigns, User Subscriptions, and Admin Management.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -13,7 +13,6 @@
 					"name": "Register",
 					"request": {
 						"method": "POST",
-						"header": [],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n    \"name\": \"Test User\",\n    \"number\": \"918866813729\",\n    \"password\": \"password123\",\n    \"userType\": \"user\"\n}",
@@ -26,7 +25,6 @@
 					"name": "Login",
 					"request": {
 						"method": "POST",
-						"header": [],
 						"body": {
 							"mode": "raw",
 							"raw": "{\n    \"number\": \"918866813729\",\n    \"password\": \"password123\",\n    \"userType\": \"user\"\n}",
@@ -34,37 +32,11 @@
 						},
 						"url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
 					}
-				},
-				{
-					"name": "Update Profile",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Updated Name\",\n    \"gender\": \"Male\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/auth/update-profile", "host": ["{{base_url}}"], "path": ["auth", "update-profile"] }
-					}
-				},
-				{
-					"name": "Buy Subscription",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"planId\": \"plan_gold_30\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/auth/buy-subscription", "host": ["{{base_url}}"], "path": ["auth", "buy-subscription"] }
-					}
 				}
 			]
 		},
 		{
-			"name": "2. Omnichannel API (API Key Auth)",
+			"name": "2. Omnichannel API (API Key)",
 			"item": [
 				{
 					"name": "WhatsApp - Send Text",
@@ -80,19 +52,6 @@
 					}
 				},
 				{
-					"name": "WhatsApp - Broadcast",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"receivers\": [\"918866813729\", \"919988776655\"],\n    \"content\": \"Bulk Omnichannel message!\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/api/v1/whatsapp/broadcast", "host": ["{{base_url}}"], "path": ["api", "v1", "whatsapp", "broadcast"] }
-					}
-				},
-				{
 					"name": "RCS - Send Text",
 					"request": {
 						"method": "POST",
@@ -104,146 +63,39 @@
 						},
 						"url": { "raw": "{{base_url}}/api/v1/rcs/send", "host": ["{{base_url}}"], "path": ["api", "v1", "rcs", "send"] }
 					}
-				},
-				{
-					"name": "RCS - Send Media",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"receiver\": \"+918866813729\",\n    \"type\": \"image\",\n    \"content\": \"https://picsum.photos/800/600\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/api/v1/rcs/media", "host": ["{{base_url}}"], "path": ["api", "v1", "rcs", "media"] }
-					}
-				},
-				{
-					"name": "RCS - Rich Card",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"receiver\": \"+918866813729\",\n    \"metadata\": {\n        \"richCard\": {\n            \"standaloneCard\": {\n                \"cardContent\": {\n                    \"title\": \"Special Deal!\",\n                    \"description\": \"50% off today!\",\n                    \"media\": { \"height\": \"MEDIUM\", \"contentInfo\": { \"fileUrl\": \"https://picsum.photos/600/400\" } },\n                    \"suggestions\": [\n                        { \"reply\": { \"text\": \"Buy Now\", \"postbackData\": \"buy_now\" } }\n                    ]\n                }\n            }\n        }\n    }\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/api/v1/rcs/rich-card", "host": ["{{base_url}}"], "path": ["api", "v1", "rcs", "rich-card"] }
-					}
-				},
-				{
-					"name": "Universal Message Status",
-					"request": {
-						"method": "GET",
-						"header": [{ "key": "x-api-key", "value": "{{api_key}}", "type": "text" }],
-						"url": { "raw": "{{base_url}}/api/v1/message/status/PASTE_ID_HERE", "host": ["{{base_url}}"], "path": ["api", "v1", "message", "status", "PASTE_ID_HERE"] }
-					}
 				}
 			]
 		},
 		{
-			"name": "3. WhatsApp Device & Management",
+			"name": "3. New Flow System",
 			"item": [
 				{
-					"name": "Connect QR",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"url": { "raw": "{{base_url}}/whatsapp/connect-qr", "host": ["{{base_url}}"], "path": ["whatsapp", "connect-qr"] }
-					}
-				},
-				{
-					"name": "Connect Pairing Code",
+					"name": "Create Flow",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "POST",
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"phone\": \"918866813729\"\n}",
+							"raw": "{\n    \"name\": \"Welcome Flow\",\n    \"trigger\": \"hi\",\n    \"nodes\": [\n        {\n            \"id\": \"1\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Hello 👋 Welcome to our service!\" },\n            \"next\": \"2\"\n        },\n        {\n            \"id\": \"2\",\n            \"type\": \"buttons\",\n            \"data\": {\n                \"text\": \"How can I help you today?\",\n                \"buttons\": [\n                    { \"id\": \"order\", \"title\": \"📦 Order\" },\n                    { \"id\": \"support\", \"title\": \"🛠 Support\" }\n                ]\n            }\n        },\n        {\n            \"id\": \"order\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Great! Opening the order catalog...\" }\n        },\n        {\n            \"id\": \"support\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Connecting you to a support agent. Please wait...\" }\n        }\n    ]\n}",
 							"options": { "raw": { "language": "json" } }
 						},
-						"url": { "raw": "{{base_url}}/whatsapp/connect-pair", "host": ["{{base_url}}"], "path": ["whatsapp", "connect-pair"] }
+						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
 					}
 				},
 				{
-					"name": "Session Status",
+					"name": "List Flows",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "GET",
-						"url": { "raw": "{{base_url}}/whatsapp/session-status", "host": ["{{base_url}}"], "path": ["whatsapp", "session-status"] }
+						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
 					}
 				},
 				{
-					"name": "Legacy Send Message",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"phone\": \"918866813729\",\n    \"message\": \"Hello from Legacy API!\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/whatsapp/send-message", "host": ["{{base_url}}"], "path": ["whatsapp", "send-message"] }
-					}
-				},
-				{
-					"name": "Create Campaign",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Holiday Sale\",\n    \"message\": \"Get ready for the sale!\",\n    \"numbers\": [\"918866813729\", \"919988776655\"]\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/whatsapp/create-campaign", "host": ["{{base_url}}"], "path": ["whatsapp", "create-campaign"] }
-					}
-				},
-				{
-					"name": "Set Webhook URL",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"webhookUrl\": \"https://your-domain.com/webhook\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/whatsapp/set-webhook", "host": ["{{base_url}}"], "path": ["whatsapp", "set-webhook"] }
-					}
-				},
-				{
-					"name": "Logout Device",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"url": { "raw": "{{base_url}}/whatsapp/logout", "host": ["{{base_url}}"], "path": ["whatsapp", "logout"] }
-					}
-				}
-			]
-		},
-		{
-			"name": "4. Multi-Node ChatFlows",
-			"item": [
-				{
-					"name": "Create Flow (Multi-Step)",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"triggerKeyword\": \"hi\",\n    \"nodes\": [\n        { \"id\": \"1\", \"type\": \"message\", \"text\": \"Welcome 👋\" },\n        { \"id\": \"2\", \"type\": \"buttons\", \"text\": \"How can I help?\", \"buttons\": [\n            {\"text\": \"Order\", \"next\": \"3\"},\n            {\"text\": \"Support\", \"next\": \"4\"}\n        ]},\n        { \"id\": \"3\", \"type\": \"message\", \"text\": \"Ordering menu opened!\" },\n        { \"id\": \"4\", \"type\": \"message\", \"text\": \"Connecting to support...\" }\n    ]\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/whatsapp/chatflows", "host": ["{{base_url}}"], "path": ["whatsapp", "chatflows"] }
-					}
-				},
-				{
-					"name": "List ChatFlows",
+					"name": "Get Flow Details",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "GET",
-						"url": { "raw": "{{base_url}}/whatsapp/chatflows", "host": ["{{base_url}}"], "path": ["whatsapp", "chatflows"] }
+						"url": { "raw": "{{base_url}}/flows/1", "host": ["{{base_url}}"], "path": ["flows", "1"] }
 					}
 				},
 				{
@@ -251,57 +103,33 @@
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "DELETE",
-						"url": { "raw": "{{base_url}}/whatsapp/chatflows/1", "host": ["{{base_url}}"], "path": ["whatsapp", "chatflows", "1"] }
-					}
-				}
-			]
-		},
-		{
-			"name": "5. Admin Panel",
-			"item": [
-				{
-					"name": "Generate User API Key",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"url": { "raw": "{{base_url}}/admin/users/918866813729/generate-api-key", "host": ["{{base_url}}"], "path": ["admin", "users", "918866813729", "generate-api-key"] }
+						"url": { "raw": "{{base_url}}/flows/1", "host": ["{{base_url}}"], "path": ["flows", "1"] }
 					}
 				},
 				{
-					"name": "Global Stats",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "GET",
-						"url": { "raw": "{{base_url}}/admin/stats", "host": ["{{base_url}}"], "path": ["admin", "stats"] }
-					}
-				},
-				{
-					"name": "List All Users",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "GET",
-						"url": { "raw": "{{base_url}}/admin/users", "host": ["{{base_url}}"], "path": ["admin", "users"] }
-					}
-				},
-				{
-					"name": "Manage Plans",
+					"name": "Example Flow with Condition",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "POST",
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"id\": \"plan_standard_30\",\n    \"name\": \"Standard 30 Days\",\n    \"days\": 30,\n    \"price\": 100\n}",
+							"raw": "{\n    \"name\": \"Condition Flow\",\n    \"trigger\": \"test\",\n    \"nodes\": [\n        {\n            \"id\": \"1\",\n            \"type\": \"buttons\",\n            \"data\": {\n                \"text\": \"Are you a member?\",\n                \"buttons\": [\n                    { \"id\": \"yes\", \"title\": \"Yes\" },\n                    { \"id\": \"no\", \"title\": \"No\" }\n                ]\n            },\n            \"next\": \"cond_1\"\n        },\n        {\n            \"id\": \"cond_1\",\n            \"type\": \"condition\",\n            \"data\": {\n                \"key\": \"1\",\n                \"operator\": \"==\",\n                \"value\": \"yes\",\n                \"onTrue\": \"member_msg\",\n                \"onFalse\": \"guest_msg\"\n            }\n        },\n        {\n            \"id\": \"member_msg\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Welcome back, Member! 🌟\" }\n        },\n        {\n            \"id\": \"guest_msg\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Hello Guest! Please sign up to continue.\" }\n        }\n    ]\n}",
 							"options": { "raw": { "language": "json" } }
 						},
-						"url": { "raw": "{{base_url}}/admin/plans", "host": ["{{base_url}}"], "path": ["admin", "plans"] }
+						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
 					}
-				},
+				}
+			]
+		},
+		{
+			"name": "4. WhatsApp Device Management",
+			"item": [
 				{
-					"name": "Clear Database (DANGER)",
+					"name": "Connect QR",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "POST",
-						"url": { "raw": "{{base_url}}/admin/clear-database", "host": ["{{base_url}}"], "path": ["admin", "clear-database"] }
+						"url": { "raw": "{{base_url}}/whatsapp/connect-qr", "host": ["{{base_url}}"], "path": ["whatsapp", "connect-qr"] }
 					}
 				}
 			]
