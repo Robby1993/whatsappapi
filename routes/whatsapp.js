@@ -106,12 +106,22 @@ async function handleIncomingMessage(phone, m) {
 
         if (currentNode) {
           let nextNodeId = null;
+
+          // Check Buttons
           if (currentNode.buttons) {
             const btn = currentNode.buttons.find(b =>
               b.text.toLowerCase() === incomingText ||
               String(b.next).toLowerCase() === incomingText
             );
             if (btn) nextNodeId = btn.next;
+          }
+
+          // Check List Selection (rowId)
+          if (!nextNodeId && currentNode.sections) {
+            currentNode.sections.forEach(sec => {
+              const row = sec.rows?.find(r => String(r.rowId) === incomingText);
+              if (row) nextNodeId = row.rowId;
+            });
           }
 
           if (nextNodeId) {
@@ -216,11 +226,11 @@ async function processFlow(phone, remoteJid, flow, currentNode, state) {
       await processFlow(phone, remoteJid, flow, nextNode, state);
     }
   }
-  else if (currentNode.type === "message") {
-    const currentIndex = flow.nodes.findIndex(n => n.id === currentNode.id);
+  else if (["message", "image", "video"].includes(currentNode.type || "message")) {
+    const currentIndex = flow.nodes.findIndex(n => String(n.id) === String(currentNode.id));
     if (currentIndex !== -1 && currentIndex < flow.nodes.length - 1) {
       const nextNode = flow.nodes[currentIndex + 1];
-      await state.update({ currentNodeId: nextNode.id });
+      await state.update({ currentNodeId: String(nextNode.id) });
       if (nextNode.type !== "buttons" && nextNode.type !== "list") {
           await processFlow(phone, remoteJid, flow, nextNode, state);
       } else {
