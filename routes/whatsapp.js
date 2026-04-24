@@ -87,55 +87,70 @@ async function handleIncomingMessage(phone, m) {
     if (msg.key.fromMe) return;
 
     const remoteJid = msg.key.remoteJid;
-    const text = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.buttonsResponseMessage?.selectedButtonId || "").toLowerCase().trim();
+    const incomingText = (msg.message?.conversation ||
+                         msg.message?.extendedTextMessage?.text ||
+                         msg.message?.buttonsResponseMessage?.selectedButtonId ||
+                         msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+                         "").toLowerCase().trim();
+
+    console.log(`📩 [${phone}] Incoming from ${remoteJid}: "${incomingText}"`);
 
     // --- 1. CHECK ACTIVE FLOW STATE ---
     let state = await FlowState.findOne({ where: { userNumber: phone, remoteJid } });
 
     if (state) {
+      console.log(`🔄 [${phone}] Found active flow state for ${remoteJid}: Node ${state.currentNodeId}`);
       const flow = await ChatFlow.findByPk(state.flowId);
       if (flow && flow.nodes && flow.nodes.length > 0) {
-        // Find current node
-        const currentNode = flow.nodes.find(n => n.id === state.currentNodeId);
+        const currentNode = flow.nodes.find(n => String(n.id) === String(state.currentNodeId));
 
-        // Find if input matches a transition/button
-        let nextNodeId = null;
-        if (currentNode.buttons) {
-          const btn = currentNode.buttons.find(b => b.text.toLowerCase() === text || b.next === text);
-          if (btn) nextNodeId = btn.next;
-        }
+        if (currentNode) {
+          let nextNodeId = null;
+          if (currentNode.buttons) {
+            const btn = currentNode.buttons.find(b =>
+              b.text.toLowerCase() === incomingText ||
+              String(b.next).toLowerCase() === incomingText
+            );
+            if (btn) nextNodeId = btn.next;
+          }
 
-        if (nextNodeId) {
-          const nextNode = flow.nodes.find(n => n.id === nextNodeId);
-          if (nextNode) {
-            await state.update({ currentNodeId: nextNodeId, lastInteraction: new Date() });
-            await processFlow(phone, remoteJid, flow, nextNode, state);
-            return;
+          if (nextNodeId) {
+            console.log(`➡️ [${phone}] Moving to next node: ${nextNodeId}`);
+            const nextNode = flow.nodes.find(n => String(n.id) === String(nextNodeId));
+            if (nextNode) {
+              await state.update({ currentNodeId: String(nextNodeId), lastInteraction: new Date() });
+              await processFlow(phone, remoteJid, flow, nextNode, state);
+              return;
+            }
           }
         }
       }
+      console.log(`🚫 [${phone}] No matching transition, clearing flow state.`);
       await state.destroy();
     }
 
     // --- 2. CHECK NEW TRIGGER ---
-    if (text) {
+    if (incomingText) {
       const flow = await ChatFlow.findOne({
-        where: { userNumber: phone, triggerKeyword: text, isActive: true }
+        where: { userNumber: phone, triggerKeyword: incomingText, isActive: true }
       });
 
       if (flow) {
+        console.log(`🚀 [${phone}] Starting flow: ${flow.triggerKeyword} (ID: ${flow.id})`);
         if (flow.nodes && flow.nodes.length > 0) {
           const firstNode = flow.nodes[0];
           state = await FlowState.create({
             userNumber: phone,
             remoteJid: remoteJid,
             flowId: flow.id,
-            currentNodeId: firstNode.id
+            currentNodeId: String(firstNode.id)
           });
           await processFlow(phone, remoteJid, flow, firstNode, state);
           return;
         } else {
-          // Legacy Single-Step Response
+          // Legacy single reply
+          console.log(`📜 [${phone}] Legacy response for: ${flow.triggerKeyword}`);
+          // ... legacy code ...
           let response = {};
           switch (flow.responseType) {
             case "text": response = { text: flow.responseText }; break;
@@ -299,7 +314,16 @@ router.use(authenticate);
  */
 router.post("/chatflows", async (req, res) => {
   try {
-    const flow = await ChatFlow.create({ ...req.body, userNumber: req.userNumber });
+    const data = { ...req.body, userNumber: req.userNumber };
+
+    // Support both 'trigger' and 'triggerKeyword'
+    if (req.body.trigger && !req.body.triggerKeyword) {
+      data.triggerKeyword = req.body.trigger.toLowerCase().trim();
+    } else if (data.triggerKeyword) {
+      data.triggerKeyword = data.triggerKeyword.toLowerCase().trim();
+    }
+
+    const flow = await ChatFlow.create(data);
     sendResponse(res, 201, "ChatFlow created", flow);
   } catch (err) { sendResponse(res, 500, "Failed to create ChatFlow", err.message); }
 });
