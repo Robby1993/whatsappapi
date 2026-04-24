@@ -65,6 +65,32 @@
 					}
 				},
 				{
+					"name": "Create Button Template",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"keyword\": \"btn_template\",\n    \"type\": \"buttons\",\n    \"content\": \"Choose your favorite color\",\n    \"footer\": \"Powered by Omnichannel\",\n    \"buttons\": [\n        { \"id\": \"red\", \"text\": \"🔴 Red\" },\n        { \"id\": \"blue\", \"text\": \"🔵 Blue\" }\n    ]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/templates", "host": ["{{base_url}}"], "path": ["templates"] }
+					}
+				},
+				{
+					"name": "Create List Template",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"keyword\": \"list_template\",\n    \"type\": \"list\",\n    \"header\": \"Our Services\",\n    \"content\": \"Please select a service from the menu\",\n    \"footer\": \"Click below to open\",\n    \"sections\": [\n        {\n            \"title\": \"Main Options\",\n            \"rows\": [\n                { \"rowId\": \"s1\", \"title\": \"Support\", \"description\": \"Talk to an agent\" },\n                { \"rowId\": \"s2\", \"title\": \"Sales\", \"description\": \"Buy products\" }\n            ]\n        }\n        \n    ]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/templates", "host": ["{{base_url}}"], "path": ["templates"] }
+					}
+				},
+				{
 					"name": "List All Templates",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
