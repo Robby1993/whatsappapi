@@ -19,6 +19,7 @@ const ScheduledMessage = require("../models/ScheduledMessage");
 const QueuedMessage = require("../models/QueuedMessage");
 const User = require("../models/User");
 const ChatFlow = require("../models/ChatFlow");
+const FlowState = require("../models/FlowState");
 const { authenticate, sendResponse } = require("../middleware/auth");
 
 const router = express.Router();
@@ -85,60 +86,96 @@ async function handleIncomingMessage(phone, m) {
     const msg = m.messages[0];
     if (msg.key.fromMe) return;
 
-    const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
-    const sender = msg.key.remoteJid;
+    const remoteJid = msg.key.remoteJid;
+    const text = (msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.buttonsResponseMessage?.selectedButtonId || "").toLowerCase().trim();
 
-    // 1. Dynamic ChatFlow (Auto Reply)
+    // --- 1. CHECK ACTIVE FLOW STATE ---
+    let state = await FlowState.findOne({ where: { userNumber: phone, remoteJid } });
+
+    if (state) {
+      const flow = await ChatFlow.findByPk(state.flowId);
+      if (flow && flow.nodes && flow.nodes.length > 0) {
+        // Find current node
+        const currentNode = flow.nodes.find(n => n.id === state.currentNodeId);
+
+        // Find if input matches a transition/button
+        let nextNodeId = null;
+        if (currentNode.buttons) {
+          const btn = currentNode.buttons.find(b => b.text.toLowerCase() === text || b.next === text);
+          if (btn) nextNodeId = btn.next;
+        }
+
+        if (nextNodeId) {
+          const nextNode = flow.nodes.find(n => n.id === nextNodeId);
+          if (nextNode) {
+            await state.update({ currentNodeId: nextNodeId, lastInteraction: new Date() });
+            await processFlow(phone, remoteJid, flow, nextNode, state);
+            return;
+          }
+        }
+      }
+      await state.destroy();
+    }
+
+    // --- 2. CHECK NEW TRIGGER ---
     if (text) {
       const flow = await ChatFlow.findOne({
-        where: {
-          userNumber: phone,
-          triggerKeyword: text.toLowerCase().trim(),
-          isActive: true
-        }
+        where: { userNumber: phone, triggerKeyword: text, isActive: true }
       });
 
       if (flow) {
-        let response = {};
-        switch (flow.responseType) {
-          case "text":
-            response = { text: flow.responseText };
-            break;
-          case "image":
-          case "video":
-          case "audio":
-          case "document":
-            response = { [flow.responseType]: { url: flow.mediaUrl }, caption: flow.responseText };
-            break;
-          case "buttons":
-            response = {
-              text: flow.responseText,
-              footer: flow.footer,
-              buttons: flow.buttons.map((b, i) => ({ buttonId: `btn_${i}`, buttonText: { displayText: b }, type: 1 })),
-              headerType: 1
-            };
-            break;
-          case "list":
-            response = {
-              text: flow.responseText,
-              title: flow.header,
-              footer: flow.footer,
-              buttonText: "View Options",
-              sections: flow.sections
-            };
-            break;
+        if (flow.nodes && flow.nodes.length > 0) {
+          const firstNode = flow.nodes[0];
+          state = await FlowState.create({
+            userNumber: phone,
+            remoteJid: remoteJid,
+            flowId: flow.id,
+            currentNodeId: firstNode.id
+          });
+          await processFlow(phone, remoteJid, flow, firstNode, state);
+          return;
+        } else {
+          // Legacy Single-Step Response
+          let response = {};
+          switch (flow.responseType) {
+            case "text": response = { text: flow.responseText }; break;
+            case "image":
+            case "video":
+            case "audio":
+            case "document":
+              response = { [flow.responseType]: { url: flow.mediaUrl }, caption: flow.responseText };
+              break;
+            case "buttons":
+              response = {
+                text: flow.responseText,
+                footer: flow.footer,
+                buttons: flow.buttons.map((b, i) => ({ buttonId: `btn_${i}`, buttonText: { displayText: b }, type: 1 })),
+                headerType: 1
+              };
+              break;
+            case "list":
+              response = {
+                text: flow.responseText,
+                title: flow.header,
+                footer: flow.footer,
+                buttonText: "View Options",
+                sections: flow.sections
+              };
+              break;
+          }
+          await sessions[phone].sendMessage(remoteJid, response);
+          return;
         }
-        await sessions[phone].sendMessage(sender, response);
       }
     }
 
-    // 2. Webhook Notifications
+    // --- 3. WEBHOOK NOTIFICATIONS ---
     const user = await User.findOne({ where: { number: phone } });
     const admin = await User.findOne({ where: { userType: "admin" } });
 
     const payload = {
       phone,
-      sender,
+      sender: remoteJid,
       pushName: msg.pushName,
       message: text || "Media Message",
       timestamp: msg.messageTimestamp,
@@ -150,6 +187,53 @@ async function handleIncomingMessage(phone, m) {
 
   } catch (err) {
     console.error("Incoming Message Error:", err.message);
+  }
+}
+
+async function processFlow(phone, remoteJid, flow, currentNode, state) {
+  await sendNode(phone, remoteJid, currentNode);
+  await delay(1000);
+
+  if (currentNode.next) {
+    const nextNode = flow.nodes.find(n => n.id === currentNode.next);
+    if (nextNode && nextNode.id !== currentNode.id) {
+      await state.update({ currentNodeId: nextNode.id });
+      await processFlow(phone, remoteJid, flow, nextNode, state);
+    }
+  }
+  else if (currentNode.type === "message") {
+    const currentIndex = flow.nodes.findIndex(n => n.id === currentNode.id);
+    if (currentIndex !== -1 && currentIndex < flow.nodes.length - 1) {
+      const nextNode = flow.nodes[currentIndex + 1];
+      await state.update({ currentNodeId: nextNode.id });
+      if (nextNode.type !== "buttons" && nextNode.type !== "list") {
+          await processFlow(phone, remoteJid, flow, nextNode, state);
+      } else {
+          await sendNode(phone, remoteJid, nextNode);
+      }
+    }
+  }
+}
+
+async function sendNode(phone, remoteJid, node) {
+  const sock = sessions[phone];
+  if (!sock) return;
+
+  if (node.type === "message" || !node.type) {
+    await sock.sendMessage(remoteJid, { text: node.text });
+  } else if (node.type === "buttons") {
+    const buttons = node.buttons.map(b => ({
+      buttonId: b.next,
+      buttonText: { displayText: b.text },
+      type: 1
+    }));
+    await sock.sendMessage(remoteJid, {
+      text: node.text || "Choose an option:",
+      buttons,
+      headerType: 1
+    });
+  } else if (node.type === "image" || node.type === "video") {
+     await sock.sendMessage(remoteJid, { [node.type]: { url: node.url }, caption: node.text });
   }
 }
 
