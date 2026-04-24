@@ -34,7 +34,10 @@ class FlowService {
   }
 
   async listFlows(userNumber) {
-    return await Flow.findAll({ where: { userNumber } });
+    return await Flow.findAll({
+      where: { userNumber },
+      include: [{ model: FlowNode, as: 'nodes' }]
+    });
   }
 
   async getFlowById(userNumber, id) {

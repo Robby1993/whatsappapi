@@ -6,28 +6,32 @@ const { sessions } = require("../routes/whatsapp");
 class FlowEngine {
   async handleIncoming(phone, remoteJid, incomingText) {
     const cleanText = incomingText.toLowerCase().trim();
+    console.log(`[FlowEngine] Incoming: "${cleanText}" from ${remoteJid} to ${phone}`);
 
-    // 1. Check if user is in an active session
-    let session = await FlowSession.findOne({
-      where: { phone: remoteJid, userNumber: phone }
-    });
-
-    if (session) {
-      console.log(`[Flow] Continuing session for ${remoteJid}`);
-      return await this.continueFlow(phone, remoteJid, session, incomingText);
-    }
-
-    // 2. Check for trigger
+    // 1. Check for a NEW trigger first (allows users to jump out of stuck flows)
     const flow = await Flow.findOne({
       where: { trigger: cleanText, userNumber: phone, isActive: true }
     });
 
     if (flow) {
-      console.log(`[Flow] Starting flow "${flow.name}" for ${remoteJid}`);
+      console.log(`[FlowEngine] Trigger Match Found: "${flow.name}"`);
+      // Clear any old session for this user first
+      await FlowSession.destroy({ where: { phone: remoteJid, userNumber: phone } });
       return await this.startFlow(phone, remoteJid, flow);
     }
 
-    return false; // No flow handled
+    // 2. If no new trigger, check if user is in an active session
+    let session = await FlowSession.findOne({
+      where: { phone: remoteJid, userNumber: phone }
+    });
+
+    if (session) {
+      console.log(`[FlowEngine] Continuing active session for ${remoteJid} at node ${session.currentNodeId}`);
+      return await this.continueFlow(phone, remoteJid, session, incomingText);
+    }
+
+    console.log(`[FlowEngine] No flow or session matched for "${cleanText}"`);
+    return false;
   }
 
   async startFlow(phone, remoteJid, flow) {
@@ -36,7 +40,10 @@ class FlowEngine {
       order: [['id', 'ASC']]
     });
 
-    if (!firstNode) return false;
+    if (!firstNode) {
+        console.error(`[FlowEngine] Error: Flow "${flow.name}" has no nodes!`);
+        return false;
+    }
 
     const session = await FlowSession.create({
       phone: remoteJid,
@@ -45,21 +52,24 @@ class FlowEngine {
       currentNodeId: firstNode.nodeId
     });
 
+    console.log(`[FlowEngine] Flow started. Executing first node: ${firstNode.nodeId}`);
     await this.executeNode(phone, remoteJid, firstNode, session);
     return true;
   }
 
   async continueFlow(phone, remoteJid, session, userReply) {
+    const cleanReply = userReply.toLowerCase().trim();
     const currentNode = await FlowNode.findOne({
       where: { flowId: session.flowId, nodeId: session.currentNodeId }
     });
 
     if (!currentNode) {
+      console.log(`[FlowEngine] Current node ${session.currentNodeId} not found, ending session.`);
       await session.destroy();
       return false;
     }
 
-    // Store user reply in variables (optional, but good for conditions)
+    // Store user reply
     const variables = { ...session.variables, [currentNode.nodeId]: userReply };
     await session.update({ variables });
 
@@ -67,16 +77,16 @@ class FlowEngine {
 
     if (currentNode.type === "buttons") {
       const btn = currentNode.data.buttons?.find(b =>
-        b.id.toLowerCase() === userReply.toLowerCase() ||
-        b.title.toLowerCase() === userReply.toLowerCase()
+        String(b.id).toLowerCase() === cleanReply ||
+        String(b.title).toLowerCase() === cleanReply
       );
       nextNodeId = btn ? (btn.next || currentNode.next) : null;
     } else if (currentNode.type === "list") {
       const allRows = [];
-      currentNode.data.sections?.forEach(s => allRows.push(...s.rows));
+      currentNode.data.sections?.forEach(s => allRows.push(...(s.rows || [])));
       const row = allRows.find(r =>
-        r.id.toLowerCase() === userReply.toLowerCase() ||
-        r.title.toLowerCase() === userReply.toLowerCase()
+        String(r.id).toLowerCase() === cleanReply ||
+        String(r.title).toLowerCase() === cleanReply
       );
       nextNodeId = row ? (row.next || currentNode.next) : null;
     } else {
@@ -85,44 +95,46 @@ class FlowEngine {
 
     if (nextNodeId) {
       const nextNode = await FlowNode.findOne({
-        where: { flowId: session.flowId, nodeId: nextNodeId }
+        where: { flowId: session.flowId, nodeId: String(nextNodeId) }
       });
 
       if (nextNode) {
-        await session.update({ currentNodeId: nextNodeId, lastInteraction: new Date() });
+        console.log(`[FlowEngine] User replied: "${userReply}". Moving to: ${nextNodeId}`);
+        await session.update({ currentNodeId: String(nextNodeId), lastInteraction: new Date() });
         await this.executeNode(phone, remoteJid, nextNode, session);
         return true;
       }
     }
 
-    // Flow ended or invalid input
-    console.log(`[Flow] Ending session for ${remoteJid}`);
+    console.log(`[FlowEngine] Flow sequence ended for ${remoteJid}`);
     await session.destroy();
     return false;
   }
 
   async executeNode(phone, remoteJid, node, session) {
     if (node.type === "condition") {
+      console.log(`[FlowEngine] Evaluating condition at node ${node.nodeId}`);
       const nextNodeId = this.evaluateCondition(node, session.variables);
       const nextNode = await FlowNode.findOne({
-        where: { flowId: session.flowId, nodeId: nextNodeId }
+        where: { flowId: session.flowId, nodeId: String(nextNodeId) }
       });
       if (nextNode) {
-        await session.update({ currentNodeId: nextNodeId });
+        await session.update({ currentNodeId: String(nextNodeId) });
         return await this.executeNode(phone, remoteJid, nextNode, session);
       }
     }
 
     await this.sendNodeMessage(phone, remoteJid, node);
 
-    // Auto-advance logic
+    // Auto-advance logic for simple messages
     if (["text", "image"].includes(node.type) && node.next) {
         const nextNode = await FlowNode.findOne({
-            where: { flowId: session.flowId, nodeId: node.next }
+            where: { flowId: session.flowId, nodeId: String(node.next) }
         });
         if (nextNode) {
-            await session.update({ currentNodeId: node.next });
-            await new Promise(r => setTimeout(r, 1000));
+            console.log(`[FlowEngine] Auto-advancing from ${node.nodeId} to ${node.next}`);
+            await session.update({ currentNodeId: String(node.next) });
+            await new Promise(r => setTimeout(r, 1500)); // Natural delay
             return await this.executeNode(phone, remoteJid, nextNode, session);
         }
     }
@@ -131,23 +143,25 @@ class FlowEngine {
   evaluateCondition(node, variables) {
     const { key, operator, value, onTrue, onFalse } = node.data;
     const actualValue = variables[key];
+    console.log(`[FlowEngine] Condition: Var(${key}) [${actualValue}] ${operator} "${value}"`);
 
     let result = false;
     switch(operator) {
       case "==": result = String(actualValue) === String(value); break;
       case "!=": result = String(actualValue) !== String(value); break;
-      case "contains": result = String(actualValue).includes(value); break;
+      case "contains": result = String(actualValue).toLowerCase().includes(String(value).toLowerCase()); break;
     }
-
-    return result ? String(onTrue) : String(onFalse);
+    return result ? onTrue : onFalse;
   }
 
   async sendNodeMessage(phone, remoteJid, node) {
     const sock = sessions[phone];
-    if (!sock) return;
+    if (!sock) {
+        console.error(`[FlowEngine] Critical: WhatsApp socket for ${phone} not found!`);
+        return;
+    }
 
     const { type, data } = node;
-
     try {
         switch (type) {
           case "text":
@@ -158,15 +172,15 @@ class FlowEngine {
             break;
           case "buttons":
             const buttons = data.buttons.map(b => ({
-              buttonId: b.id,
+              buttonId: String(b.id),
               buttonText: { displayText: b.title },
               type: 1
             }));
-            await sock.sendMessage(remoteJid, { text: data.text, buttons, headerType: 1 });
+            await sock.sendMessage(remoteJid, { text: data.text || "Select:", buttons, headerType: 1 });
             break;
           case "list":
             await sock.sendMessage(remoteJid, {
-              text: data.text,
+              text: data.text || "Select:",
               title: data.title,
               buttonText: data.buttonText || "Options",
               sections: data.sections
@@ -174,7 +188,7 @@ class FlowEngine {
             break;
         }
     } catch (e) {
-        console.error(`[Flow Engine] Error sending message:`, e.message);
+        console.error(`[FlowEngine] Error sending message:`, e.message);
     }
   }
 }

@@ -1,8 +1,8 @@
 {
 	"info": {
-		"_postman_id": "omnichannel-messaging-v1-ultimate-v2",
-		"name": "Omnichannel Messaging API - COMPLETE",
-		"description": "Comprehensive Postman collection for the Omnichannel Messaging API. Includes WhatsApp, RCS, Multi-node Flows, Campaigns, User Subscriptions, and Admin Management.",
+		"_postman_id": "omnichannel-messaging-v1-ultimate-v3",
+		"name": "Omnichannel Messaging API - ALL ENDPOINTS",
+		"description": "Complete collection for Flutter development. Includes Auth, Dashboard, Multi-node Flows, Campaigns, WhatsApp/RCS Messaging, and Admin tools.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -36,7 +36,30 @@
 			]
 		},
 		{
-			"name": "2. Omnichannel API (API Key)",
+			"name": "2. Dashboard & Stats",
+			"item": [
+				{
+					"name": "User Dashboard",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/admin/dashboard", "host": ["{{base_url}}"], "path": ["admin", "dashboard"] },
+						"description": "Primary endpoint for Flutter main screen. Returns message metrics, flow stats, subscription days, and recent activity."
+					}
+				},
+				{
+					"name": "Admin Global Stats",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/admin/stats", "host": ["{{base_url}}"], "path": ["admin", "stats"] },
+						"description": "Admin only: Bird's eye view of total users and messages across the entire system."
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Omnichannel Messaging (API Key)",
 			"item": [
 				{
 					"name": "WhatsApp - Send Text",
@@ -67,69 +90,69 @@
 			]
 		},
 		{
-			"name": "3. New Flow System",
+			"name": "4. Flow Management",
 			"item": [
 				{
-					"name": "Create Flow",
+					"name": "Create Multi-node Flow",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "POST",
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Welcome Flow\",\n    \"trigger\": \"hi\",\n    \"nodes\": [\n        {\n            \"id\": \"1\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Hello 👋 Welcome to our service!\" },\n            \"next\": \"2\"\n        },\n        {\n            \"id\": \"2\",\n            \"type\": \"buttons\",\n            \"data\": {\n                \"text\": \"How can I help you today?\",\n                \"buttons\": [\n                    { \"id\": \"order\", \"title\": \"📦 Order\" },\n                    { \"id\": \"support\", \"title\": \"🛠 Support\" }\n                ]\n            }\n        },\n        {\n            \"id\": \"order\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Great! Opening the order catalog...\" }\n        },\n        {\n            \"id\": \"support\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Connecting you to a support agent. Please wait...\" }\n        }\n    ]\n}",
+							"raw": "{\n    \"name\": \"Welcome Flow\",\n    \"trigger\": \"hi\",\n    \"nodes\": [\n        {\n            \"id\": \"1\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Hello 👋 Welcome!\" },\n            \"next\": \"2\"\n        },\n        {\n            \"id\": \"2\",\n            \"type\": \"buttons\",\n            \"data\": {\n                \"text\": \"How can I help?\",\n                \"buttons\": [\n                    { \"id\": \"order\", \"title\": \"📦 Order\", \"next\": \"3\" },\n                    { \"id\": \"support\", \"title\": \"🛠 Support\", \"next\": \"4\" }\n                ]\n            }\n        },\n        { \"id\": \"3\", \"type\": \"text\", \"data\": { \"text\": \"Opening menu...\" } },\n        { \"id\": \"4\", \"type\": \"text\", \"data\": { \"text\": \"Connecting to agent...\" } }\n    ]\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
 					}
 				},
 				{
-					"name": "List Flows",
+					"name": "List All My Flows",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "GET",
-						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
-					}
-				},
-				{
-					"name": "Get Flow Details",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "GET",
-						"url": { "raw": "{{base_url}}/flows/1", "host": ["{{base_url}}"], "path": ["flows", "1"] }
-					}
-				},
-				{
-					"name": "Delete Flow",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "DELETE",
-						"url": { "raw": "{{base_url}}/flows/1", "host": ["{{base_url}}"], "path": ["flows", "1"] }
-					}
-				},
-				{
-					"name": "Example Flow with Condition",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Condition Flow\",\n    \"trigger\": \"test\",\n    \"nodes\": [\n        {\n            \"id\": \"1\",\n            \"type\": \"buttons\",\n            \"data\": {\n                \"text\": \"Are you a member?\",\n                \"buttons\": [\n                    { \"id\": \"yes\", \"title\": \"Yes\" },\n                    { \"id\": \"no\", \"title\": \"No\" }\n                ]\n            },\n            \"next\": \"cond_1\"\n        },\n        {\n            \"id\": \"cond_1\",\n            \"type\": \"condition\",\n            \"data\": {\n                \"key\": \"1\",\n                \"operator\": \"==\",\n                \"value\": \"yes\",\n                \"onTrue\": \"member_msg\",\n                \"onFalse\": \"guest_msg\"\n            }\n        },\n        {\n            \"id\": \"member_msg\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Welcome back, Member! 🌟\" }\n        },\n        {\n            \"id\": \"guest_msg\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Hello Guest! Please sign up to continue.\" }\n        }\n    ]\n}",
-							"options": { "raw": { "language": "json" } }
-						},
 						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
 					}
 				}
 			]
 		},
 		{
-			"name": "4. WhatsApp Device Management",
+			"name": "5. Device Management",
 			"item": [
 				{
-					"name": "Connect QR",
+					"name": "Connect via QR",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "POST",
 						"url": { "raw": "{{base_url}}/whatsapp/connect-qr", "host": ["{{base_url}}"], "path": ["whatsapp", "connect-qr"] }
+					}
+				},
+				{
+					"name": "Session Status",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/whatsapp/session-status", "host": ["{{base_url}}"], "path": ["whatsapp", "session-status"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Admin Panel",
+			"item": [
+				{
+					"name": "Generate API Key",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"url": { "raw": "{{base_url}}/admin/users/918866813729/generate-api-key", "host": ["{{base_url}}"], "path": ["admin", "users", "918866813729", "generate-api-key"] }
+					}
+				},
+				{
+					"name": "List All Users",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/admin/users", "host": ["{{base_url}}"], "path": ["admin", "users"] }
 					}
 				}
 			]
