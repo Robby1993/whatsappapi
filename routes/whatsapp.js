@@ -35,8 +35,8 @@ async function getBaileysVersion() {
       const { version } = await fetchLatestBaileysVersion();
       latestBaileysVersion = version;
     } catch (e) {
-      latestBaileysVersion = [2, 3000, 1015901307];
-      // latestBaileysVersion = [2, 2413, 1];
+      // Fallback to a very stable recent version if fetch fails
+      latestBaileysVersion = [2, 3000, 1017531202];
     }
   }
   return latestBaileysVersion;
@@ -244,28 +244,42 @@ async function sendNode(phone, remoteJid, node) {
   const sock = sessions[phone];
   if (!sock) return;
 
-  if (node.type === "message" || !node.type) {
-    await sock.sendMessage(remoteJid, { text: node.text });
-  } else if (node.type === "buttons") {
-    const buttons = node.buttons.map(b => ({
-      buttonId: String(b.next),
-      buttonText: { displayText: b.text },
-      type: 1
-    }));
-    await sock.sendMessage(remoteJid, {
-      text: node.text || "Choose an option:",
-      buttons,
-      headerType: 1
-    });
-  } else if (node.type === "list") {
-    await sock.sendMessage(remoteJid, {
-      text: node.text || "Select an option:",
-      title: node.title,
-      buttonText: node.buttonText || "View Menu",
-      sections: node.sections
-    });
-  } else if (node.type === "image" || node.type === "video") {
-     await sock.sendMessage(remoteJid, { [node.type]: { url: node.url }, caption: node.text });
+  // Verify socket is truly open before sending
+  if (sock.ws?.readyState !== 1) {
+    console.log(`⚠️ [${phone}] Socket not ready (State: ${sock.ws?.readyState}), attempting restart...`);
+    await initWhatsApp(phone);
+    await delay(3000); // Give it time to open
+  }
+
+  try {
+    if (node.type === "message" || !node.type) {
+      await sock.sendMessage(remoteJid, { text: node.text });
+    } else if (node.type === "buttons") {
+      const buttons = node.buttons.map(b => ({
+        buttonId: String(b.next),
+        buttonText: { displayText: b.text },
+        type: 1
+      }));
+      await sock.sendMessage(remoteJid, {
+        text: node.text || "Choose an option:",
+        buttons,
+        headerType: 1
+      });
+    } else if (node.type === "list") {
+      await sock.sendMessage(remoteJid, {
+        text: node.text || "Select an option:",
+        title: node.title,
+        buttonText: node.buttonText || "View Menu",
+        sections: node.sections
+      });
+    } else if (node.type === "image" || node.type === "video") {
+       await sock.sendMessage(remoteJid, { [node.type]: { url: node.url }, caption: node.text });
+    }
+  } catch (err) {
+    console.error(`❌ [${phone}] Failed to send node:`, err.message);
+    if (err.message.includes("Closed")) {
+       setTimeout(() => initWhatsApp(phone), 2000);
+    }
   }
 }
 
@@ -281,7 +295,9 @@ async function initWhatsApp(phone) {
     syncFullHistory: false,
     shouldSyncHistoryMessage: () => false,
     connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 0
+    defaultQueryTimeoutMs: 0,
+    keepAliveIntervalMs: 30000, // Keep connection alive on Render
+    retryRequestDelayMs: 5000
   });
 
   sessions[phone] = sock;
