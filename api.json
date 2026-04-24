@@ -1,8 +1,8 @@
 {
 	"info": {
-		"_postman_id": "omnichannel-messaging-v1-ultimate-v3",
+		"_postman_id": "omnichannel-messaging-v1-ultimate-v5",
 		"name": "Omnichannel Messaging API - ALL ENDPOINTS",
-		"description": "Complete collection for Flutter development. Includes Auth, Dashboard, Multi-node Flows, Campaigns, WhatsApp/RCS Messaging, and Admin tools.",
+		"description": "Complete collection for Flutter development. Includes Auth, Dashboard, Multi-node Flows, Templates (CRUD), Campaigns (CRUD), WhatsApp/RCS Messaging, and Admin tools.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -43,23 +43,136 @@
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "GET",
-						"url": { "raw": "{{base_url}}/admin/dashboard", "host": ["{{base_url}}"], "path": ["admin", "dashboard"] },
-						"description": "Primary endpoint for Flutter main screen. Returns message metrics, flow stats, subscription days, and recent activity."
-					}
-				},
-				{
-					"name": "Admin Global Stats",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "GET",
-						"url": { "raw": "{{base_url}}/admin/stats", "host": ["{{base_url}}"], "path": ["admin", "stats"] },
-						"description": "Admin only: Bird's eye view of total users and messages across the entire system."
+						"url": { "raw": "{{base_url}}/admin/dashboard", "host": ["{{base_url}}"], "path": ["admin", "dashboard"] }
 					}
 				}
 			]
 		},
 		{
-			"name": "3. Omnichannel Messaging (API Key)",
+			"name": "3. Templates (CRUD)",
+			"item": [
+				{
+					"name": "Create Template",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"keyword\": \"welcome_offer\",\n    \"type\": \"text\",\n    \"content\": \"Hello! Welcome to our store. Use code WELCOME10 for 10% off.\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/templates", "host": ["{{base_url}}"], "path": ["templates"] }
+					}
+				},
+				{
+					"name": "List All Templates",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/templates", "host": ["{{base_url}}"], "path": ["templates"] }
+					}
+				},
+				{
+					"name": "Get Template",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/templates/welcome_offer", "host": ["{{base_url}}"], "path": ["templates", "welcome_offer"] }
+					}
+				},
+				{
+					"name": "Update Template",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "PUT",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"content\": \"Hello! Welcome to our updated store. Use code WELCOME20 for 20% off.\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/templates/welcome_offer", "host": ["{{base_url}}"], "path": ["templates", "welcome_offer"] }
+					}
+				},
+				{
+					"name": "Delete Template",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "DELETE",
+						"url": { "raw": "{{base_url}}/templates/welcome_offer", "host": ["{{base_url}}"], "path": ["templates", "welcome_offer"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Campaigns (CRUD)",
+			"item": [
+				{
+					"name": "Create Campaign",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Marketing Launch\",\n    \"message\": \"Our new product is live! Check it out at https://example.com\",\n    \"numbers\": [\"918866813729\", \"919988776655\"]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/campaigns", "host": ["{{base_url}}"], "path": ["campaigns"] }
+					}
+				},
+				{
+					"name": "List All Campaigns",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/campaigns", "host": ["{{base_url}}"], "path": ["campaigns"] }
+					}
+				},
+				{
+					"name": "Get Campaign Details",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/campaigns/1", "host": ["{{base_url}}"], "path": ["campaigns", "1"] }
+					}
+				},
+				{
+					"name": "Delete Campaign",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "DELETE",
+						"url": { "raw": "{{base_url}}/campaigns/1", "host": ["{{base_url}}"], "path": ["campaigns", "1"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Flow Management (Multi-Node)",
+			"item": [
+				{
+					"name": "Create Flow",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "POST",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Support Flow\",\n    \"trigger\": \"help\",\n    \"nodes\": [\n        { \"id\": \"1\", \"type\": \"text\", \"data\": { \"text\": \"How can we help?\" }, \"next\": \"2\" },\n        { \"id\": \"2\", \"type\": \"buttons\", \"data\": { \"text\": \"Select option\", \"buttons\": [{\"id\":\"opt1\",\"title\":\"Order\"}, {\"id\":\"opt2\",\"title\":\"Chat\"}]} }\n    ]\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
+					}
+				},
+				{
+					"name": "List All Flows",
+					"request": {
+						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
+						"method": "GET",
+						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Omnichannel Messaging (API Key)",
 			"item": [
 				{
 					"name": "WhatsApp - Send Text",
@@ -90,36 +203,10 @@
 			]
 		},
 		{
-			"name": "4. Flow Management",
+			"name": "7. Device Management",
 			"item": [
 				{
-					"name": "Create Multi-node Flow",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Welcome Flow\",\n    \"trigger\": \"hi\",\n    \"nodes\": [\n        {\n            \"id\": \"1\",\n            \"type\": \"text\",\n            \"data\": { \"text\": \"Hello 👋 Welcome!\" },\n            \"next\": \"2\"\n        },\n        {\n            \"id\": \"2\",\n            \"type\": \"buttons\",\n            \"data\": {\n                \"text\": \"How can I help?\",\n                \"buttons\": [\n                    { \"id\": \"order\", \"title\": \"📦 Order\", \"next\": \"3\" },\n                    { \"id\": \"support\", \"title\": \"🛠 Support\", \"next\": \"4\" }\n                ]\n            }\n        },\n        { \"id\": \"3\", \"type\": \"text\", \"data\": { \"text\": \"Opening menu...\" } },\n        { \"id\": \"4\", \"type\": \"text\", \"data\": { \"text\": \"Connecting to agent...\" } }\n    ]\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
-					}
-				},
-				{
-					"name": "List All My Flows",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "GET",
-						"url": { "raw": "{{base_url}}/flows", "host": ["{{base_url}}"], "path": ["flows"] }
-					}
-				}
-			]
-		},
-		{
-			"name": "5. Device Management",
-			"item": [
-				{
-					"name": "Connect via QR",
+					"name": "Connect QR",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "POST",
@@ -137,18 +224,10 @@
 			]
 		},
 		{
-			"name": "6. Admin Panel",
+			"name": "8. Admin Management",
 			"item": [
 				{
-					"name": "Generate API Key",
-					"request": {
-						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
-						"method": "POST",
-						"url": { "raw": "{{base_url}}/admin/users/918866813729/generate-api-key", "host": ["{{base_url}}"], "path": ["admin", "users", "918866813729", "generate-api-key"] }
-					}
-				},
-				{
-					"name": "List All Users",
+					"name": "List Users",
 					"request": {
 						"auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }] },
 						"method": "GET",

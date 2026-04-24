@@ -534,25 +534,6 @@ router.post("/broadcast", async (req, res) => {
   }
 });
 
-router.post("/create-campaign", async (req, res) => {
-  try {
-    const sender = req.body.from || req.userNumber;
-    const { name, message, numbers } = req.body;
-    if (!name || !message || !numbers) return sendResponse(res, 400, "Fields missing");
-    const campaign = await Campaign.create({ name, sender, message, totalContacts: numbers.length });
-    const queued = numbers.map(num => ({ sender, receiver: num, message, campaignId: campaign.id }));
-    await QueuedMessage.bulkCreate(queued);
-    sendResponse(res, 201, "Campaign created", campaign);
-  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
-});
-
-router.get("/campaigns", async (req, res) => {
-  try {
-    const campaigns = await Campaign.findAll({ where: { sender: req.userNumber }, order: [['createdAt', 'DESC']] });
-    sendResponse(res, 200, "Campaigns fetched", campaigns);
-  } catch (err) { sendResponse(res, 500, "Failed", err.message); }
-});
-
 router.post("/logout", async (req, res) => {
   try {
     const phone = (req.body.phone || req.userNumber).replace(/\D/g, "");

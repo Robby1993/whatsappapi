@@ -13,6 +13,8 @@ const { sessions, sessionStatus } = require("./sessionStore");
 const adminRoutes = require("./routes/admin");
 const messagingRoutes = require("./routes/messaging");
 const flowRoutes = require("./flows/flow.routes");
+const templateRoutes = require("./routes/templates");
+const campaignRoutes = require("./routes/campaigns");
 
 const schedulerWorker = require("./workers/scheduler");
 const queueWorker = require("./workers/queue");
@@ -33,6 +35,8 @@ app.use("/whatsapp", whatsappRoutes);
 app.use("/admin", adminRoutes);
 app.use("/api/v1", messagingRoutes);
 app.use("/flows", flowRoutes);
+app.use("/templates", templateRoutes);
+app.use("/campaigns", campaignRoutes);
 
 // Startup
 async function init() {
