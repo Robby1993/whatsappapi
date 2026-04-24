@@ -238,7 +238,7 @@ async function sendNode(phone, remoteJid, node) {
     await sock.sendMessage(remoteJid, { text: node.text });
   } else if (node.type === "buttons") {
     const buttons = node.buttons.map(b => ({
-      buttonId: b.next,
+      buttonId: String(b.next),
       buttonText: { displayText: b.text },
       type: 1
     }));
@@ -246,6 +246,13 @@ async function sendNode(phone, remoteJid, node) {
       text: node.text || "Choose an option:",
       buttons,
       headerType: 1
+    });
+  } else if (node.type === "list") {
+    await sock.sendMessage(remoteJid, {
+      text: node.text || "Select an option:",
+      title: node.title,
+      buttonText: node.buttonText || "View Menu",
+      sections: node.sections
     });
   } else if (node.type === "image" || node.type === "video") {
      await sock.sendMessage(remoteJid, { [node.type]: { url: node.url }, caption: node.text });
@@ -322,6 +329,12 @@ router.post("/chatflows", async (req, res) => {
     } else if (data.triggerKeyword) {
       data.triggerKeyword = data.triggerKeyword.toLowerCase().trim();
     }
+
+    // --- PREVENT DUPLICATE TRIGGERS ---
+    const existing = await ChatFlow.findOne({
+      where: { userNumber: req.userNumber, triggerKeyword: data.triggerKeyword }
+    });
+    if (existing) return sendResponse(res, 400, "A ChatFlow with this trigger already exists.");
 
     const flow = await ChatFlow.create(data);
     sendResponse(res, 201, "ChatFlow created", flow);
