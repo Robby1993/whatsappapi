@@ -3,6 +3,7 @@ const Message = require("../models/Message");
 const Campaign = require("../models/Campaign");
 const Flow = require("../models/Flow");
 const FlowSession = require("../models/FlowSession");
+const Template = require("../models/Template");
 const { sessionStatus } = require("../sessionStore");
 const { Op } = require("sequelize");
 
@@ -12,16 +13,26 @@ class DashboardController {
       const userNumber = req.userNumber;
 
       // 1. Message Metrics
-      const totalWhatsApp = await Message.count({ where: { sender: userNumber, channel: "whatsapp" } });
-      const totalRCS = await Message.count({ where: { sender: userNumber, channel: "rcs" } });
-      const failedMessages = await Message.count({ where: { sender: userNumber, status: "failed" } });
+      const totalMessages = await Message.count({ where: { sender: userNumber } });
+      const deliveredCount = await Message.count({
+        where: {
+          sender: userNumber,
+          status: { [Op.in]: ["sent", "delivered", "read"] }
+        }
+      });
+      const readCount = await Message.count({ where: { sender: userNumber, status: "read" } });
 
-      // 2. Flow Metrics
-      const activeFlows = await Flow.count({ where: { userNumber, isActive: true } });
-      const activeSessions = await FlowSession.count({ where: { userNumber } });
+      const readRate = totalMessages > 0 ? ((readCount / totalMessages) * 100).toFixed(1) : "0";
+
+      // 2. Template Metrics
+      const totalTemplates = await Template.count(); // Global or per user if you add userNumber to Template model
 
       // 3. Campaign Metrics
-      const totalCampaigns = await Campaign.count({ where: { sender: userNumber } });
+      const recentCampaigns = await Campaign.findAll({
+        where: { sender: userNumber },
+        limit: 5,
+        order: [["createdAt", "DESC"]]
+      });
 
       // 4. User & Subscription
       const user = await User.findOne({
@@ -32,35 +43,21 @@ class DashboardController {
       const expiry = Number(user.createdAt) + (user.validDays * 86400000);
       const daysRemaining = Math.max(0, Math.ceil((expiry - Date.now()) / 86400000));
 
-      // 5. Recent Activity
-      const recentActivity = await Message.findAll({
-        where: { sender: userNumber },
-        limit: 10,
-        order: [["createdAt", "DESC"]]
-      });
-
-      // 6. Device Status
+      // 5. Device Status
       const device = sessionStatus[userNumber] || { status: "not_connected" };
 
       res.status(200).json({
         status: true,
         message: "Dashboard data fetched",
         result: {
-          metrics: {
-            messages: {
-                whatsapp: totalWhatsApp,
-                rcs: totalRCS,
-                failed: failedMessages,
-                total: totalWhatsApp + totalRCS
-            },
-            flows: {
-                activeFlows,
-                currentLiveSessions: activeSessions
-            },
-            campaigns: {
-                total: totalCampaigns
-            }
-          },
+          // --- Fields specifically for Flutter UI ---
+          totalMessages: totalMessages,
+          delivered: deliveredCount,
+          readRate: `${readRate}%`,
+          totalTemplates: totalTemplates,
+          recentCampaigns: recentCampaigns,
+
+          // --- Additional Detailed Metrics ---
           account: {
             name: user.name,
             number: user.number,
@@ -69,11 +66,17 @@ class DashboardController {
             apiKey: user.apiKey,
             deviceStatus: device.status
           },
-          recentActivity
+          metrics: {
+              flows: {
+                  activeFlows: await Flow.count({ where: { userNumber, isActive: true } }),
+                  currentLiveSessions: await FlowSession.count({ where: { userNumber } })
+              }
+          }
         }
       });
 
     } catch (error) {
+      console.error("Dashboard Error:", error);
       res.status(500).json({ status: false, error: error.message });
     }
   }
