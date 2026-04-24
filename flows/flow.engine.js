@@ -1,7 +1,7 @@
 const Flow = require("../models/Flow");
 const FlowNode = require("../models/FlowNode");
 const FlowSession = require("../models/FlowSession");
-const { sessions } = require("../routes/whatsapp");
+const { sessions } = require("../sessionStore");
 
 class FlowEngine {
   async handleIncoming(phone, remoteJid, incomingText) {

@@ -22,12 +22,9 @@ const ChatFlow = require("../models/ChatFlow");
 const FlowState = require("../models/FlowState");
 const flowEngine = require("../flows/flow.engine");
 const { authenticate, sendResponse } = require("../middleware/auth");
+const { sessions, sessionStatus, loggingOut } = require("../sessionStore");
 
 const router = express.Router();
-
-const sessions = {};
-const sessionStatus = {};
-const loggingOut = {};
 
 let latestBaileysVersion = null;
 async function getBaileysVersion() {
@@ -289,6 +286,12 @@ async function sendNode(phone, remoteJid, node) {
 }
 
 async function initWhatsApp(phone) {
+  // Prevent multiple connection attempts for the same phone
+  if (sessionStatus[phone]?.status === "connecting" || sessionStatus[phone]?.status === "connected") {
+    console.log(`⚠️ [${phone}] Connection already in progress or open. Skipping init.`);
+    return sessions[phone];
+  }
+
   const { state, saveCreds } = await usePostgresAuthState(phone);
   const version = await getBaileysVersion();
 
@@ -327,7 +330,11 @@ async function initWhatsApp(phone) {
         Session.destroy({ where: { phone } }).catch(() => {});
       } else if (!loggingOut[phone]) {
         sessionStatus[phone].status = "disconnected";
-        setTimeout(() => initWhatsApp(phone), 5000);
+        // Only retry if not already connecting
+        if (sessionStatus[phone]?.status !== "connecting") {
+           console.log(`🔄 [${phone}] Connection closed, retrying in 5s...`);
+           setTimeout(() => initWhatsApp(phone), 5000);
+        }
       }
     }
   });
@@ -551,4 +558,4 @@ router.post("/logout", async (req, res) => {
   }
 });
 
-module.exports = { router, startSession, sessions, sessionStatus };
+module.exports = { router, startSession };

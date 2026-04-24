@@ -1,4 +1,4 @@
-const { sessions, sessionStatus } = require("../routes/whatsapp");
+const { sessions, sessionStatus } = require("../sessionStore");
 const Message = require("../models/Message");
 
 class WhatsAppService {

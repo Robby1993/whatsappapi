@@ -3,7 +3,7 @@ const Message = require("../models/Message");
 const Campaign = require("../models/Campaign");
 const Flow = require("../models/Flow");
 const FlowSession = require("../models/FlowSession");
-const { sessionStatus } = require("../routes/whatsapp");
+const { sessionStatus } = require("../sessionStore");
 const { Op } = require("sequelize");
 
 class DashboardController {
