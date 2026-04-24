@@ -67,8 +67,13 @@ async function forceLogoutWhatsApp(phone) {
     delete sessionStatus[phone];
   }
 
-  // Delete from Database
+  // Delete Creds from Database
   await Session.destroy({ where: { phone } });
+
+  // Delete Active Flow Sessions (Both Engines)
+  const FlowSession = require("../models/FlowSession");
+  await FlowSession.destroy({ where: { userNumber: phone } });
+  await FlowState.destroy({ where: { userNumber: phone } });
 
   // Delete from Filesystem (Legacy)
   const folder = sessionFolder(phone);
