@@ -16,7 +16,8 @@ module.exports = function(sessions, sessionStatus, startSession) {
       await msg.update({ status: "processing" });
 
       if (!sessions[msg.sender] || sessionStatus[msg.sender]?.status !== "connected") {
-        console.log(`⏳ Queue: Sender ${msg.sender} not connected, skipping...`);
+        console.log(`⏳ Queue: Sender ${msg.sender} not connected, attempting to start...`);
+        startSession(msg.sender);
         await msg.update({ status: "pending" });
         return;
       }

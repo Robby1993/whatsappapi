@@ -17,7 +17,8 @@ module.exports = function(sessions, sessionStatus, startSession) {
 
       for (const msg of pending) {
         if (!sessions[msg.sender] || sessionStatus[msg.sender]?.status !== "connected") {
-          console.log(`⏰ Scheduler: Sender ${msg.sender} not connected, skipping...`);
+          console.log(`⏰ Scheduler: Sender ${msg.sender} not connected, attempting to start...`);
+          startSession(msg.sender);
           continue;
         }
         try {

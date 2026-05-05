@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 
 const sequelize = require("./db");
 const User = require("./models/User");
@@ -57,6 +58,27 @@ async function init() {
 
     app.listen(PORT, "0.0.0.0", async () => {
       console.log(`🚀 Server running on port ${PORT}`);
+
+      // 🚚 Auto-migrate filesystem sessions to Database (if any)
+      try {
+        const sessionsDir = path.join(__dirname, "sessions");
+        if (fs.existsSync(sessionsDir)) {
+          const folders = fs.readdirSync(sessionsDir);
+          for (const phone of folders) {
+            const credsFile = path.join(sessionsDir, phone, "creds.json");
+            if (fs.existsSync(credsFile)) {
+              const exists = await Session.findOne({ where: { phone, dataType: "creds", dataId: "base" } });
+              if (!exists) {
+                console.log(`🚚 Migrating session for ${phone} from filesystem to Database...`);
+                const data = fs.readFileSync(credsFile, "utf-8");
+                await Session.create({ phone, dataType: "creds", dataId: "base", data });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("⚠️ Migration error:", e.message);
+      }
 
       // Restore active sessions from PostgreSQL Database
       try {
