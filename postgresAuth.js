@@ -6,13 +6,17 @@ const Session = require("./models/Session");
  */
 const usePostgresAuthState = async (phone) => {
   const writeData = async (data, type, id) => {
-    const sData = JSON.stringify(data, BufferJSON.replacer);
-    await Session.upsert({
-      phone,
-      dataType: type,
-      dataId: id,
-      data: sData
-    });
+    try {
+      const sData = JSON.stringify(data, BufferJSON.replacer);
+      await Session.upsert({
+        phone,
+        dataType: type,
+        dataId: id,
+        data: sData
+      });
+    } catch (err) {
+      console.error(`Error writing auth data (${type}/${id}):`, err.message);
+    }
   };
 
   const readData = async (type, id) => {
@@ -23,14 +27,19 @@ const usePostgresAuthState = async (phone) => {
       if (!session || !session.data) return null;
       return JSON.parse(session.data, BufferJSON.reviver);
     } catch (error) {
+      console.error(`Error reading auth data (${type}/${id}):`, error.message);
       return null;
     }
   };
 
   const removeData = async (type, id) => {
-    await Session.destroy({
-      where: { phone, dataType: type, dataId: id }
-    });
+    try {
+      await Session.destroy({
+        where: { phone, dataType: type, dataId: id }
+      });
+    } catch (err) {
+      console.error(`Error removing auth data (${type}/${id}):`, err.message);
+    }
   };
 
   // Load initial creds
@@ -74,6 +83,7 @@ const usePostgresAuthState = async (phone) => {
       }
     },
     saveCreds: async () => {
+      // Baileys modifies 'creds' object in-place, so we always save the current state
       await writeData(creds, "creds", "base");
     }
   };
