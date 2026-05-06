@@ -86,6 +86,150 @@ async function handleIncomingMessage(phone, m) {
       let msgContent = msg.message;
       if (!msgContent) continue;
 
+      // ✅ unwrap nested messages
+      if (msgContent.ephemeralMessage) msgContent = msgContent.ephemeralMessage.message;
+      if (msgContent.viewOnceMessage) msgContent = msgContent.viewOnceMessage.message;
+      if (msgContent.viewOnceMessageV2) msgContent = msgContent.viewOnceMessageV2.message;
+      if (msgContent.documentWithCaptionMessage) msgContent = msgContent.documentWithCaptionMessage.message;
+
+      const sender = msg.key.remoteJid;
+
+      // ✅ TEXT EXTRACTION (FIXED)
+      let text =
+        msgContent.conversation ||
+        msgContent.extendedTextMessage?.text ||
+        msgContent.imageMessage?.caption ||
+        msgContent.videoMessage?.caption ||
+
+        // ✅ BUTTON RESPONSE (FIX)
+        msgContent.buttonsResponseMessage?.selectedDisplayText ||
+
+        // ✅ LIST RESPONSE (FIX)
+        msgContent.listResponseMessage?.singleSelectReply?.title ||
+
+        // ✅ TEMPLATE BUTTON
+        msgContent.templateButtonReplyMessage?.selectedDisplayText ||
+
+        "";
+
+      text = text.toLowerCase().trim();
+
+      if (!text) continue;
+
+      console.log(`📩 ${phone} ← ${sender}: "${text}"`);
+
+      // ✅ DEBUG RAW MESSAGE (VERY IMPORTANT)
+      console.log("RAW:", JSON.stringify(msgContent, null, 2));
+
+      // ✅ FIND FLOW (SMART MATCH)
+      const flow = await ChatFlow.findOne({
+        where: {
+          userNumber: phone,
+          isActive: true,
+          triggerKeyword: {
+            [Op.iLike]: `%${text}%`
+          }
+        }
+      });
+
+      if (!flow) return;
+
+      console.log(`🎯 Flow Triggered: ${flow.triggerKeyword}`);
+
+      let response = {};
+
+      // ✅ RESPONSE BUILDER
+      switch (flow.responseType) {
+
+        // ---------------- TEXT ----------------
+        case "text":
+          response = { text: flow.responseText };
+          break;
+
+        // ---------------- MEDIA ----------------
+        case "image":
+        case "video":
+        case "audio":
+        case "document":
+          response = {
+            [flow.responseType]: { url: flow.mediaUrl },
+            caption: flow.responseType !== "audio" ? flow.responseText : undefined
+          };
+          break;
+
+        // ---------------- BUTTONS (FIXED) ----------------
+        case "buttons":
+          response = {
+            text: flow.responseText,
+            footer: flow.footer || "",
+            buttons: (flow.buttons || []).slice(0, 3).map((b, i) => ({
+              buttonId: `btn_${i}`,
+              buttonText: { displayText: b },
+              type: 1
+            })),
+            headerType: 1
+          };
+          break;
+
+        // ---------------- LIST (FIXED) ----------------
+        case "list":
+          response = {
+            text: flow.responseText,
+            footer: flow.footer || "",
+            title: flow.header || "Menu",
+            buttonText: "Select Option",
+            sections: [
+              {
+                title: "Options",
+                rows: (flow.sections || []).map((item, i) => ({
+                  title: item.title,
+                  description: item.description || "",
+                  rowId: `row_${i}`
+                }))
+              }
+            ]
+          };
+          break;
+      }
+
+      // ✅ SEND MESSAGE
+      await sessions[phone].sendMessage(sender, response);
+
+      // ---------------- WEBHOOK ----------------
+      const user = await User.findOne({ where: { number: phone } });
+      const admin = await User.findOne({ where: { userType: "admin" } });
+
+      const payload = {
+        phone,
+        sender,
+        message: text,
+        type: Object.keys(msgContent)[0],
+        timestamp: msg.messageTimestamp
+      };
+
+      if (user?.webhookUrl) {
+        axios.post(user.webhookUrl, payload).catch(() => {});
+      }
+
+      if (admin?.webhookUrl && admin.number !== phone) {
+        axios.post(admin.webhookUrl, { ...payload, userNumber: phone }).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error("❌ Incoming Message Error:", err.message);
+  }
+}
+
+async function handleIncomingMessage1(phone, m) {
+  try {
+    if (!m.messages || m.type !== "notify") return;
+
+    for (const msg of m.messages) {
+      if (msg.key.fromMe) continue;
+
+      let msgContent = msg.message;
+      if (!msgContent) continue;
+
       // Handle nested messages (Ephemeral, ViewOnce, etc.)
       if (msgContent.ephemeralMessage) msgContent = msgContent.ephemeralMessage.message;
       if (msgContent.viewOnceMessage) msgContent = msgContent.viewOnceMessage.message;
