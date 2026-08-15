@@ -11,7 +11,7 @@ import {
 import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<any>({
     totalSent: 0,
     recentLogs: [],
     profile: null
@@ -98,7 +98,7 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {stats.recentLogs.map((log: any, i) => (
+              {stats.recentLogs.map((log: any, i: number) => (
                 <tr key={i} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 text-sm text-gray-900">{log.receiver}</td>
                   <td className="px-6 py-4 text-sm text-gray-600 truncate max-w-xs">{log.message}</td>

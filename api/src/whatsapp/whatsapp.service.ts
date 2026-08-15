@@ -51,7 +51,9 @@ export class WhatsappService implements OnModuleInit {
 
         console.log(`🔌 Initializing WhatsApp session: ${cleanPhone}`);
         const { state, saveCreds } = await this.postgresAuthService.getAuthState(cleanPhone);
-        const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 1015901307] as WAVersion }));
+        const { version } = (await fetchLatestBaileysVersion().catch(() => ({
+          version: [2, 3000, 1015901307],
+        }))) as { version: WAVersion };
 
         const sock = makeWASocket({
           version,
