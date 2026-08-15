@@ -1,52 +1,67 @@
 # Dependencies
 node_modules/
-*/node_modules/
+.pnp
+.pnp.js
 
-# Build outputs
-dist/
-api/dist/
-shared/dist/
+# Testing
+coverage/
+
+# Next.js
 .next/
-web/.next/
 out/
+
+# NestJS / TypeScript
+dist/
+*.tsbuildinfo
+
+# Production
 build/
 
-# Environment files
-.env
-api/.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
 
-# WhatsApp Sessions (Data moved to PostgreSQL)
-sessions/
-api/sessions/
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
 
-# OS specific files
+# OS Files
 .DS_Store
 .DS_Store?
 ._*
 Thumbs.db
 desktop.ini
 
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+# Environment and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
 
-# IDEs
-.idea/
-.vscode/
-*.swp
-*.swo
+# API specific
+apps/api/.env
+apps/api/sessions/
+sessions/
 
-# Coverage
-coverage/
-api/coverage/
+# Shared package
+packages/shared/dist/
 
-# Next.js specific
-next-env.d.ts
-.next/
+# Turbo
+.turbo/
+
+# Vercel
+.vercel
+
+# Temporary files
+tmp/
+temp/

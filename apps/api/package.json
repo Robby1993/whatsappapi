@@ -1,8 +1,8 @@
 {
-  "name": "msgpilot",
+  "name": "@msgpilot/api",
   "version": "1.0.0",
   "description": "MsgPilot: Modular WhatsApp API with NestJS and PostgreSQL",
-  "main": "dist/main",
+  "main": "dist/main.js",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -36,7 +36,8 @@
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "sequelize": "^6.35.1",
-    "sequelize-typescript": "^2.1.6"
+    "sequelize-typescript": "^2.1.6",
+    "@msgpilot/shared": "*"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",

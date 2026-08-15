@@ -1,5 +1,5 @@
 {
-  "name": "msgpilot-frontend",
+  "name": "@msgpilot/web",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -19,7 +19,8 @@
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.4.1",
     "tailwind-merge": "^2.0.0",
-    "zustand": "^4.4.6"
+    "zustand": "^4.4.6",
+    "@msgpilot/shared": "*"
   },
   "devDependencies": {
     "@types/node": "^20.9.2",

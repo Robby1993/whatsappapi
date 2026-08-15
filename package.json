@@ -4,16 +4,15 @@
   "private": true,
   "description": "MsgPilot Monorepo - WhatsApp Automation",
   "workspaces": [
-    "api",
-    "web",
-    "shared"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
-    "api:dev": "npm --prefix api run start:dev",
-    "web:dev": "npm --prefix web run dev",
+    "api:dev": "npm --prefix apps/api run build && npm --prefix apps/api run start:dev",
+    "web:dev": "npm --prefix apps/web run dev",
     "dev": "concurrently \"npm run api:dev\" \"npm run web:dev\"",
     "dev:clean": "set NODE_OPTIONS=--no-deprecation && concurrently \"npm run api:dev\" \"npm run web:dev\"",
-    "build:shared": "npm --prefix shared run build",
+    "build:shared": "npm --prefix packages/shared run build",
     "install:all": "npm install"
   },
   "devDependencies": {
