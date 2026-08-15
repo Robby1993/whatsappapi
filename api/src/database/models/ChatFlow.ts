@@ -64,4 +64,18 @@ export class ChatFlow extends Model {
     defaultValue: true,
   })
   isActive: boolean;
+
+  @Column({
+    type: DataType.BIGINT,
+    allowNull: true,
+    defaultValue: () => Date.now(),
+  })
+  createdAt: number;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+    defaultValue: DataType.NOW,
+  })
+  updatedAt: Date;
 }

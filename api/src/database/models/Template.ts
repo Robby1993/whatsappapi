@@ -59,4 +59,18 @@ export class Template extends Model {
     defaultValue: '',
   })
   fileName: string;
+
+  @Column({
+    type: DataType.BIGINT,
+    allowNull: true,
+    defaultValue: () => Date.now(),
+  })
+  createdAt: number;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+    defaultValue: DataType.NOW,
+  })
+  updatedAt: Date;
 }

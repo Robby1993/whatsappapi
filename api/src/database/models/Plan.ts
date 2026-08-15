@@ -29,4 +29,18 @@ export class Plan extends Model {
     allowNull: false,
   })
   price: number;
+
+  @Column({
+    type: DataType.BIGINT,
+    allowNull: true,
+    defaultValue: () => Date.now(),
+  })
+  createdAt: number;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+    defaultValue: DataType.NOW,
+  })
+  updatedAt: Date;
 }

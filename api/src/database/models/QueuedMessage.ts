@@ -39,4 +39,18 @@ export class QueuedMessage extends Model {
 
   @BelongsTo(() => Campaign)
   campaign: Campaign;
+
+  @Column({
+    type: DataType.BIGINT,
+    allowNull: true,
+    defaultValue: () => Date.now(),
+  })
+  createdAt: number;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+    defaultValue: DataType.NOW,
+  })
+  updatedAt: Date;
 }

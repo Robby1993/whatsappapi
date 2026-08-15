@@ -32,6 +32,20 @@ export class MessageLog extends Model {
 
   @Column({
     type: DataType.BIGINT,
+    allowNull: true,
+    defaultValue: () => Date.now(),
+  })
+  createdAt: number;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+    defaultValue: DataType.NOW,
+  })
+  updatedAt: Date;
+
+  @Column({
+    type: DataType.BIGINT,
     defaultValue: () => Date.now(),
   })
   timestamp: number;
