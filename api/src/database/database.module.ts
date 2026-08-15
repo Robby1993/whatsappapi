@@ -40,7 +40,7 @@ import { Plan } from './models/Plan';
           autoLoadModels: true,
           synchronize: true,
           sync: {
-            alter: true,
+            force: true, // Temporarily set to true to fix schema mismatch
           },
           logging: false,
           dialectOptions: {
