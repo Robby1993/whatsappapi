@@ -54,7 +54,7 @@ export class WhatsappService implements OnModuleInit {
         console.log(`🔑 Auth State loaded for: ${cleanPhone}`);
 
         const { version } = (await fetchLatestBaileysVersion().catch(() => ({
-          version: [2, 3000, 1015901307],
+          version: [2, 3000, 1015901307], // Latest stable fallback
         }))) as { version: WAVersion };
         console.log(`📦 WhatsApp Version: ${version.join('.')} for ${cleanPhone}`);
 
@@ -62,14 +62,34 @@ export class WhatsappService implements OnModuleInit {
           version,
           auth: state,
           printQRInTerminal: false,
-          browser: Browsers.macOS('Desktop'),
+          browser: Browsers.ubuntu('Chrome'), // Most reliable signature
           syncFullHistory: false,
           shouldSyncHistoryMessage: () => false,
-          connectTimeoutMs: 90000,
-          defaultQueryTimeoutMs: 90000,
-          keepAliveIntervalMs: 30000,
-          markOnlineOnConnect: false,
+          connectTimeoutMs: 60000,
+          defaultQueryTimeoutMs: 0, // Set to 0 to prevent query timeouts during linking
+          keepAliveIntervalMs: 10000,
           generateHighQualityLinkPreview: true,
+          patchMessageBeforeSending: (message) => {
+            const requiresPatch = !!(
+              message.buttonsMessage ||
+              message.templateMessage ||
+              message.listMessage
+            );
+            if (requiresPatch) {
+              return {
+                viewOnceMessage: {
+                  message: {
+                    messageContextInfo: {
+                      deviceListMetadata: {},
+                      deviceListMetadataVersion: 2,
+                    },
+                    ...message,
+                  },
+                },
+              };
+            }
+            return message;
+          },
         });
 
         this.sessions.set(cleanPhone, sock);
