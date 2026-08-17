@@ -1,0 +1,17 @@
+export const countries = [
+  { name: 'India', code: '+91', flag: '🇮🇳' },
+  { name: 'USA', code: '+1', flag: '🇺🇸' },
+  { name: 'UK', code: '+44', flag: '🇬🇧' },
+  { name: 'UAE', code: '+971', flag: '🇦🇪' },
+  { name: 'Saudi Arabia', code: '+966', flag: '🇸🇦' },
+  { name: 'Pakistan', code: '+92', flag: '🇵🇰' },
+  { name: 'Bangladesh', code: '+880', flag: '🇧🇩' },
+  { name: 'Canada', code: '+1', flag: '🇨🇦' },
+  { name: 'Australia', code: '+61', flag: '🇦🇺' },
+  { name: 'Germany', code: '+49', flag: '🇩🇪' },
+  { name: 'France', code: '+33', flag: '🇫🇷' },
+  { name: 'Italy', code: '+39', flag: '🇮🇹' },
+  { name: 'Spain', code: '+34', flag: '🇪🇸' },
+  { name: 'Brazil', code: '+55', flag: '🇧🇷' },
+  { name: 'South Africa', code: '+27', flag: '🇿🇦' },
+];

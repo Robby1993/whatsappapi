@@ -7,8 +7,10 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff } from 'lucide-react';
+import { countries } from '@/lib/countries';
 
 export default function LoginPage() {
+  const [countryCode, setCountryCode] = useState('+91');
   const [number, setNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,8 +23,9 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      const fullNumber = countryCode.replace('+', '') + number.replace(/\D/g, '');
       const response = await api.post('/users/login', {
-        number,
+        number: fullNumber,
         password,
         userType,
       });
@@ -52,14 +55,27 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700">Phone Number</label>
-            <input
-              type="text"
-              required
-              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-              placeholder="e.g. 919876543210"
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-            />
+            <div className="flex mt-1">
+              <select
+                className="block w-32 px-3 py-3 border border-gray-300 rounded-l-lg border-r-0 focus:ring-primary focus:border-primary bg-white text-sm"
+                value={countryCode}
+                onChange={(e) => setCountryCode(e.target.value)}
+              >
+                {countries.map((c) => (
+                  <option key={c.name + c.code} value={c.code}>
+                    {c.flag} {c.code}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                required
+                className="block w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:ring-primary focus:border-primary"
+                placeholder="Mobile Number"
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+              />
+            </div>
           </div>
 
           <div>
