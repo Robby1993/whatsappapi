@@ -51,9 +51,12 @@ export class WhatsappService implements OnModuleInit {
 
         console.log(`🔌 Initializing WhatsApp session: ${cleanPhone}`);
         const { state, saveCreds } = await this.postgresAuthService.getAuthState(cleanPhone);
+        console.log(`🔑 Auth State loaded for: ${cleanPhone}`);
+
         const { version } = (await fetchLatestBaileysVersion().catch(() => ({
           version: [2, 3000, 1015901307],
         }))) as { version: WAVersion };
+        console.log(`📦 WhatsApp Version: ${version.join('.')} for ${cleanPhone}`);
 
         const sock = makeWASocket({
           version,
@@ -61,9 +64,12 @@ export class WhatsappService implements OnModuleInit {
           printQRInTerminal: false,
           browser: Browsers.macOS('Desktop'),
           syncFullHistory: false,
-          connectTimeoutMs: 60000,
-          keepAliveIntervalMs: 15000,
-          // Removed defaultQueryTimeoutMs: 0 as it can cause crashes on closed sockets
+          shouldSyncHistoryMessage: () => false,
+          connectTimeoutMs: 90000,
+          defaultQueryTimeoutMs: 90000,
+          keepAliveIntervalMs: 30000,
+          markOnlineOnConnect: false,
+          generateHighQualityLinkPreview: true,
         });
 
         this.sessions.set(cleanPhone, sock);
@@ -73,7 +79,11 @@ export class WhatsappService implements OnModuleInit {
 
         sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
           const status = this.sessionStatus.get(cleanPhone) || { status: 'connecting' };
-          if (qr) status.qr = qr;
+
+          if (qr) {
+            status.qr = qr;
+            this.sessionStatus.set(cleanPhone, status);
+          }
 
           if (connection === 'open') {
             this.sessionStatus.set(cleanPhone, { status: 'connected', qr: null });
@@ -89,8 +99,7 @@ export class WhatsappService implements OnModuleInit {
               this.sessionStatus.delete(cleanPhone);
               this.sessionModel.destroy({ where: { phone: cleanPhone } }).catch(() => {});
             } else if (!this.loggingOut.has(cleanPhone)) {
-              const currentStatus = this.sessionStatus.get(cleanPhone) || {};
-              this.sessionStatus.set(cleanPhone, { ...currentStatus, status: 'disconnected' });
+              this.sessionStatus.set(cleanPhone, { ...status, status: 'disconnected' });
               setTimeout(() => this.initWhatsApp(cleanPhone), 5000);
             }
           }
