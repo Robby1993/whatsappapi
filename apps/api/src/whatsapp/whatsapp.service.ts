@@ -59,9 +59,11 @@ export class WhatsappService implements OnModuleInit {
           version,
           auth: state,
           printQRInTerminal: false,
-          browser: Browsers.ubuntu('Chrome'),
+          browser: Browsers.macOS('Desktop'),
           syncFullHistory: false,
           connectTimeoutMs: 60000,
+          defaultQueryTimeoutMs: 0,
+          keepAliveIntervalMs: 10000,
         });
 
         this.sessions.set(cleanPhone, sock);
