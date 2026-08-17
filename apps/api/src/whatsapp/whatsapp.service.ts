@@ -87,8 +87,8 @@ export class WhatsappService implements OnModuleInit {
               this.sessionStatus.delete(cleanPhone);
               this.sessionModel.destroy({ where: { phone: cleanPhone } }).catch(() => {});
             } else if (!this.loggingOut.has(cleanPhone)) {
-              status.status = 'disconnected';
-              this.sessionStatus.set(cleanPhone, status);
+              const currentStatus = this.sessionStatus.get(cleanPhone) || {};
+              this.sessionStatus.set(cleanPhone, { ...currentStatus, status: 'disconnected' });
               setTimeout(() => this.initWhatsApp(cleanPhone), 5000);
             }
           }
@@ -130,5 +130,30 @@ export class WhatsappService implements OnModuleInit {
   getStatus(phone: string) {
     const cleanPhone = phone.replace(/\D/g, '');
     return this.sessionStatus.get(cleanPhone) || { status: 'not_connected' };
+  }
+
+  async broadcast(sender: string, numbers: string[], message: string, messageLogModel: any, statModel: any) {
+    const sock = this.sessions.get(sender);
+    if (!sock || this.getStatus(sender).status !== 'connected') {
+      throw new Error(`WhatsApp (${sender}) is disconnected.`);
+    }
+
+    const results = [];
+    for (const num of numbers) {
+      try {
+        const jid = num.replace(/\D/g, '') + '@s.whatsapp.net';
+        await sock.sendMessage(jid, { text: message });
+
+        await messageLogModel.create({ sender, receiver: num, message, status: 'sent' });
+        const [stat] = await statModel.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
+        await stat.increment('totalMessagesSent');
+
+        results.push({ number: num, status: 'sent' });
+        await new Promise(r => setTimeout(r, 1000)); // Throttling
+      } catch (e) {
+        results.push({ number: num, status: 'failed', error: e.message });
+      }
+    }
+    return results;
   }
 }

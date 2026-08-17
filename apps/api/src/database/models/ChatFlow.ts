@@ -7,7 +7,7 @@ import { Table, Column, Model, DataType } from 'sequelize-typescript';
 export class ChatFlow extends Model {
   @Column({
     type: DataType.STRING,
-    allowNull: false,
+    allowNull: true,
   })
   userNumber: string;
 

@@ -19,18 +19,31 @@ export class WhatsappController {
 
   @Post('connect-pair')
   async connectPair(@Body('phone') phone: string, @Req() req: any) {
-    const targetPhone = (phone || req.userNumber).toString().replace(/\D/g, '');
-    await this.whatsappService.forceLogout(targetPhone);
-    const sock = await this.whatsappService.initWhatsApp(targetPhone);
+    try {
+      const targetPhone = (phone || req.userNumber).toString().replace(/\D/g, '');
+      console.log(`📡 Requesting pairing code for: ${targetPhone}`);
 
-    // Wait a bit for pairing code generation
-    await new Promise((r) => setTimeout(r, 5000));
+      await this.whatsappService.forceLogout(targetPhone);
+      const sock = await this.whatsappService.initWhatsApp(targetPhone);
 
-    if (!sock.authState.creds.registered) {
-      const code = await sock.requestPairingCode(targetPhone);
-      return { message: 'Pairing code generated', result: { pairingCode: code } };
-    } else {
-      return { message: 'Already connected', result: { status: 'connected' } };
+      // Wait for socket to be ready
+      await new Promise((r) => setTimeout(r, 6000));
+
+      if (sock && !sock.authState.creds.registered) {
+        const code = await sock.requestPairingCode(targetPhone);
+        const currentStatus = this.whatsappService.sessionStatus.get(targetPhone) || {};
+        this.whatsappService.sessionStatus.set(targetPhone, {
+          ...currentStatus,
+          status: 'pairing',
+          pairingCode: code
+        });
+        return { message: 'Pairing code generated', result: { pairingCode: code } };
+      } else {
+        return { message: 'Already connected', result: { status: 'connected' } };
+      }
+    } catch (err) {
+      console.error(`❌ Pairing Code Error:`, err.message);
+      return { message: 'Failed to generate pairing code', result: null };
     }
   }
 
@@ -82,6 +95,23 @@ export class WhatsappController {
     await stat.increment('totalMessagesSent');
 
     return { message: 'Message sent successfully', result };
+  }
+
+  @Post('broadcast')
+  async broadcast(@Body() body: { numbers: string[]; message: string; from?: string }, @Req() req: any) {
+    const sender = (body.from || req.userNumber).toString().replace(/\D/g, '');
+    try {
+      const results = await this.whatsappService.broadcast(
+        sender,
+        body.numbers,
+        body.message,
+        this.messageLogModel,
+        this.statModel
+      );
+      return { message: 'Broadcast processed', result: { total: body.numbers.length, results } };
+    } catch (err) {
+      return { message: err.message, result: null };
+    }
   }
 
   @Post('logout')

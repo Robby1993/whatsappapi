@@ -12,7 +12,9 @@ import {
   Zap,
   FileText,
   Database,
-  ShieldCheck
+  ShieldCheck,
+  Send,
+  Radio
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
@@ -23,6 +25,8 @@ const Sidebar = () => {
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Connections', path: '/connections', icon: Zap },
+    { name: 'Send Message', path: '/send-message', icon: Send },
+    { name: 'Broadcast', path: '/broadcast', icon: Radio },
     { name: 'ChatFlows', path: '/chatflows', icon: MessageSquare },
     { name: 'Templates', path: '/templates', icon: FileText },
     { name: 'Campaigns', path: '/campaigns', icon: Database },
