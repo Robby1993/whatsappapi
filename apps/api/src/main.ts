@@ -10,6 +10,16 @@ dotenv.config();
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Global Safety Net to prevent library-internal errors from crashing the process
+  process.on('uncaughtException', (err) => {
+    console.error('🔥 Global Uncaught Exception:', err.message);
+    if (err.stack) console.error(err.stack);
+  });
+
+  process.on('unhandledRejection', (reason: any) => {
+    console.error('🌊 Global Unhandled Rejection:', reason?.message || reason);
+  });
+
   app.setGlobalPrefix('api');
   app.enableCors();
 

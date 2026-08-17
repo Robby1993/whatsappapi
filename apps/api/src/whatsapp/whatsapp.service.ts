@@ -62,8 +62,8 @@ export class WhatsappService implements OnModuleInit {
           browser: Browsers.macOS('Desktop'),
           syncFullHistory: false,
           connectTimeoutMs: 60000,
-          defaultQueryTimeoutMs: 0,
-          keepAliveIntervalMs: 10000,
+          keepAliveIntervalMs: 15000,
+          // Removed defaultQueryTimeoutMs: 0 as it can cause crashes on closed sockets
         });
 
         this.sessions.set(cleanPhone, sock);
