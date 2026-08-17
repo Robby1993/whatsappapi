@@ -1,11 +1,6 @@
-- `[x]` Remove old Flutter web code
-- `[x]` Setup Next.js project structure (package.json, tsconfig, next.config)
-- `[x]` Implement API Client (Axios) and Auth Logic
-- `[x]` Implement Shared Components (Sidebar, Navbar, Layout)
-- `[x]` Implement Auth Pages (Login, Register, Forgot Password)
-- `[x]` Implement Dashboard and Stats
-- `[x]` Implement WhatsApp Connections (QR, Pairing)
-- `[x]` Implement ChatFlows and Templates Management
-- `[x]` Implement Campaigns and Bulk Messaging
-- `[x]` Implement Admin Panel (User Management)
-- `[x]` Final Verification and Testing
+- `[x]` Refactor to Monorepo structure (`apps/`, `packages/`)
+- `[x]` Update workspace configurations and dependencies
+- `[x]` Centralize dependency management in root `package.json`
+- `[x]` Configure production-ready `.gitignore`
+- `[x]` Commit and push changes to GitHub
+- `[/]` Final Verification and Setup Instructions

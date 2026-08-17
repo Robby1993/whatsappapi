@@ -10,6 +10,7 @@ import { ChatflowsModule } from './chatflows/chatflows.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AdminModule } from './admin/admin.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -26,5 +27,6 @@ import { AdminModule } from './admin/admin.module';
     TasksModule,
     AdminModule,
   ],
+  controllers: [AppController],
 })
 export class AppModule {}
