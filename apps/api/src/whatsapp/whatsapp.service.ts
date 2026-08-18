@@ -38,7 +38,17 @@ export class WhatsappService implements OnModuleInit {
 
   async initWhatsApp(phone: string): Promise<any> {
     const cleanPhone = phone.replace(/\D/g, '');
+
+    // Guard against multiple initializations
     if (this.initializing.has(cleanPhone)) return this.initializing.get(cleanPhone);
+
+    // If already connected, return the existing session
+    if (this.sessions.has(cleanPhone)) {
+        const currentStatus = this.getStatus(cleanPhone).status;
+        if (currentStatus === 'connected' || currentStatus === 'connecting' || currentStatus === 'pairing') {
+            return this.sessions.get(cleanPhone);
+        }
+    }
 
     const promise = (async () => {
       try {
@@ -62,34 +72,15 @@ export class WhatsappService implements OnModuleInit {
           version,
           auth: state,
           printQRInTerminal: false,
-          browser: Browsers.ubuntu('Chrome'), // Most reliable signature
+          browser: Browsers.macOS('Chrome'), // Using macOS Chrome specifically
           syncFullHistory: false,
           shouldSyncHistoryMessage: () => false,
           connectTimeoutMs: 60000,
-          defaultQueryTimeoutMs: 0, // Set to 0 to prevent query timeouts during linking
-          keepAliveIntervalMs: 10000,
+          defaultQueryTimeoutMs: 0,
+          keepAliveIntervalMs: 15000,
           generateHighQualityLinkPreview: true,
-          patchMessageBeforeSending: (message) => {
-            const requiresPatch = !!(
-              message.buttonsMessage ||
-              message.templateMessage ||
-              message.listMessage
-            );
-            if (requiresPatch) {
-              return {
-                viewOnceMessage: {
-                  message: {
-                    messageContextInfo: {
-                      deviceListMetadata: {},
-                      deviceListMetadataVersion: 2,
-                    },
-                    ...message,
-                  },
-                },
-              };
-            }
-            return message;
-          },
+          // Add retry logic for metadata to look more human
+          retryRequestDelayMs: 5000,
         });
 
         this.sessions.set(cleanPhone, sock);

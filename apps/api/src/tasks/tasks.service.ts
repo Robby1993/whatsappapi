@@ -36,9 +36,15 @@ export class TasksService {
       await msg.update({ status: 'processing' });
 
       const sock = this.whatsappService.sessions.get(msg.sender);
-      if (!sock || this.whatsappService.getStatus(msg.sender).status !== 'connected') {
-        this.logger.log(`⏳ Queue: Sender ${msg.sender} not connected, attempting to start...`);
-        this.whatsappService.initWhatsApp(msg.sender).catch(() => {});
+      const status = this.whatsappService.getStatus(msg.sender).status;
+
+      if (!sock || status !== 'connected') {
+        // Only attempt to start if not already trying
+        if (status === 'not_connected' || status === 'disconnected') {
+          this.logger.log(`⏳ Queue: Sender ${msg.sender} not connected, attempting to start...`);
+          this.whatsappService.initWhatsApp(msg.sender).catch(() => {});
+        }
+
         await msg.update({ status: 'pending' });
         return;
       }
