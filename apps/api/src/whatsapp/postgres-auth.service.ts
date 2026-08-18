@@ -14,12 +14,16 @@ export class PostgresAuthService {
     const writeData = async (data: any, type: string, id: string) => {
       try {
         const sData = JSON.stringify(data, BufferJSON.replacer);
-        await this.sessionModel.upsert({
-          phone,
-          dataType: type,
-          dataId: id,
-          data: sData,
+
+        // Use findOrCreate + update for maximum compatibility and to avoid "Validation error" during critical pairing
+        const [session, created] = await this.sessionModel.findOrCreate({
+          where: { phone, dataType: type, dataId: id },
+          defaults: { data: sData }
         });
+
+        if (!created) {
+          await session.update({ data: sData });
+        }
       } catch (err) {
         console.error(`Error writing auth data (${type}/${id}):`, err.message);
       }

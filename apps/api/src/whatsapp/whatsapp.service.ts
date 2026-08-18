@@ -93,11 +93,13 @@ export class WhatsappService implements OnModuleInit {
 
           if (qr) {
             status.qr = qr;
+            status.status = 'pairing';
             this.sessionStatus.set(cleanPhone, status);
+            console.log(`📸 New QR Code generated for: ${cleanPhone}`);
           }
 
           if (connection === 'open') {
-            this.sessionStatus.set(cleanPhone, { status: 'connected', qr: null });
+            this.sessionStatus.set(cleanPhone, { status: 'connected', qr: null, pairingCode: null });
             console.log(`✅ WhatsApp Connected: ${cleanPhone}`);
           }
 
@@ -109,6 +111,9 @@ export class WhatsappService implements OnModuleInit {
               this.sessions.delete(cleanPhone);
               this.sessionStatus.delete(cleanPhone);
               this.sessionModel.destroy({ where: { phone: cleanPhone } }).catch(() => {});
+            } else if (reason === 515) {
+              console.log(`🔄 Restart required (515) for ${cleanPhone}, reconnecting now...`);
+              this.initWhatsApp(cleanPhone).catch(() => {});
             } else if (!this.loggingOut.has(cleanPhone)) {
               this.sessionStatus.set(cleanPhone, { ...status, status: 'disconnected' });
               setTimeout(() => this.initWhatsApp(cleanPhone), 5000);
