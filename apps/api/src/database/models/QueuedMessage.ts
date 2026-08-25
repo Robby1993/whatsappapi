@@ -5,7 +5,7 @@ import { Campaign } from './Campaign';
   tableName: 'QueuedMessages',
   timestamps: true,
 })
-export class QueuedMessage extends Model {
+export class QueuedMessage extends Model<QueuedMessage> {
   @Column({
     type: DataType.STRING,
     allowNull: false,

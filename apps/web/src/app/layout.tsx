@@ -31,23 +31,15 @@ export default function RootLayout({
     }
   }, [user, pathname, router, initialized, isAuthPage]);
 
-  if (!initialized) {
-    return (
-      <html lang="en">
-        <body className={inter.className}>
-          <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        </body>
-      </html>
-    );
-  }
-
   return (
     <html lang="en">
       <body className={inter.className}>
         <Toaster position="top-right" />
-        {isAuthPage ? (
+        {!initialized ? (
+          <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : isAuthPage ? (
           children
         ) : (
           <div className="flex h-screen overflow-hidden">

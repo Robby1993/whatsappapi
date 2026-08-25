@@ -1,46 +1,43 @@
 import { Table, Column, Model, DataType } from 'sequelize-typescript';
 
 @Table({
-  tableName: 'Plans',
+  tableName: 'ChatSessions',
   timestamps: true,
 })
-export class Plan extends Model<Plan> {
+export class ChatSession extends Model<ChatSession> {
   @Column({
     type: DataType.STRING,
     allowNull: false,
-    unique: true,
   })
-  planId: string;
+  senderJid: string;
 
   @Column({
     type: DataType.STRING,
     allowNull: false,
   })
-  name: string;
+  botPhone: string;
 
   @Column({
     type: DataType.INTEGER,
-    allowNull: false,
+    allowNull: true,
   })
-  days: number;
+  currentFlowId: number;
 
   @Column({
-    type: DataType.FLOAT,
-    allowNull: false,
+    type: DataType.INTEGER,
+    defaultValue: 0,
   })
-  price: number;
+  currentStepIndex: number;
+
+  @Column({
+    type: DataType.JSON,
+    allowNull: true,
+  })
+  context: any;
 
   @Column({
     type: DataType.DATE,
-    allowNull: true,
     defaultValue: DataType.NOW,
   })
-  createdAt: Date;
-
-  @Column({
-    type: DataType.DATE,
-    allowNull: true,
-    defaultValue: DataType.NOW,
-  })
-  updatedAt: Date;
+  lastInteraction: Date;
 }

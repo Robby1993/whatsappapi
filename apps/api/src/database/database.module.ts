@@ -12,6 +12,7 @@ import { MessageLog } from './models/MessageLog';
 import { Stat } from './models/Stat';
 import { Template } from './models/Template';
 import { Plan } from './models/Plan';
+import { ChatSession } from './models/ChatSession';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { Plan } from './models/Plan';
             Token,
             Session,
             ChatFlow,
+            ChatSession,
             Campaign,
             QueuedMessage,
             ScheduledMessage,
@@ -66,6 +68,7 @@ import { Plan } from './models/Plan';
       Token,
       Session,
       ChatFlow,
+      ChatSession,
       Campaign,
       QueuedMessage,
       ScheduledMessage,

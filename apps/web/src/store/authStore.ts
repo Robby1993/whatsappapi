@@ -16,25 +16,10 @@ interface AuthState {
   init: () => void;
 }
 
-const getInitialState = () => {
-  if (typeof window === 'undefined') return { user: null, token: null, initialized: false };
-
-  const token = localStorage.getItem('auth_token');
-  const userData = localStorage.getItem('user_data');
-
-  if (token && userData) {
-    try {
-      return { user: JSON.parse(userData), token, initialized: true };
-    } catch (e) {
-      return { user: null, token: null, initialized: true };
-    }
-  }
-
-  return { user: null, token: null, initialized: false };
-};
-
 export const useAuthStore = create<AuthState>((set) => ({
-  ...getInitialState(),
+  user: null,
+  token: null,
+  initialized: false,
   setAuth: (user, token) => {
     localStorage.setItem('auth_token', token);
     localStorage.setItem('user_data', JSON.stringify(user));
@@ -46,7 +31,17 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, token: null, initialized: true });
   },
   init: () => {
-    const state = getInitialState();
-    set({ ...state, initialized: true });
+    const token = localStorage.getItem('auth_token');
+    const userData = localStorage.getItem('user_data');
+
+    if (token && userData) {
+      try {
+        set({ user: JSON.parse(userData), token, initialized: true });
+      } catch (e) {
+        set({ user: null, token: null, initialized: true });
+      }
+    } else {
+      set({ initialized: true });
+    }
   },
 }));

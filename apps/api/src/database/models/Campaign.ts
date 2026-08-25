@@ -4,7 +4,7 @@ import { Table, Column, Model, DataType } from 'sequelize-typescript';
   tableName: 'Campaigns',
   timestamps: true,
 })
-export class Campaign extends Model {
+export class Campaign extends Model<Campaign> {
   @Column({
     type: DataType.STRING,
     allowNull: false,

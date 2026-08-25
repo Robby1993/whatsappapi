@@ -5,7 +5,7 @@ import { Campaign } from './Campaign';
   tableName: 'MessageLogs',
   timestamps: true,
 })
-export class MessageLog extends Model {
+export class MessageLog extends Model<MessageLog> {
   @Column({
     type: DataType.STRING,
     allowNull: false,

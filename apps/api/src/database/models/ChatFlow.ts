@@ -4,7 +4,7 @@ import { Table, Column, Model, DataType } from 'sequelize-typescript';
   tableName: 'ChatFlows',
   timestamps: true,
 })
-export class ChatFlow extends Model {
+export class ChatFlow extends Model<ChatFlow> {
   @Column({
     type: DataType.STRING,
     allowNull: true,
@@ -13,51 +13,27 @@ export class ChatFlow extends Model {
 
   @Column({
     type: DataType.STRING,
+    allowNull: true,
+  })
+  botPhone: string;
+
+  @Column({
+    type: DataType.STRING,
     allowNull: false,
   })
-  triggerKeyword: string;
-
-  @Column({
-    type: DataType.ENUM('text', 'image', 'video', 'audio', 'document', 'buttons', 'list'),
-    defaultValue: 'text',
-  })
-  responseType: string;
-
-  @Column({
-    type: DataType.TEXT,
-    allowNull: true,
-  })
-  responseText: string;
-
-  @Column({
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  mediaUrl: string;
+  name: string;
 
   @Column({
     type: DataType.JSON,
-    allowNull: true,
+    allowNull: false,
   })
-  buttons: string[];
+  triggerKeywords: string[];
 
   @Column({
     type: DataType.JSON,
-    allowNull: true,
+    allowNull: false,
   })
-  sections: any[];
-
-  @Column({
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  header: string;
-
-  @Column({
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  footer: string;
+  steps: any[];
 
   @Column({
     type: DataType.BOOLEAN,

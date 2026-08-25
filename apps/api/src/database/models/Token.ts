@@ -4,7 +4,7 @@ import { Table, Column, Model, DataType } from 'sequelize-typescript';
   tableName: 'Tokens',
   timestamps: false,
 })
-export class Token extends Model {
+export class Token extends Model<Token> {
   @Column({
     type: DataType.STRING,
     allowNull: false,

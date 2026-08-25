@@ -4,7 +4,7 @@ import { Table, Column, Model, DataType } from 'sequelize-typescript';
   tableName: 'ScheduledMessages',
   timestamps: true,
 })
-export class ScheduledMessage extends Model {
+export class ScheduledMessage extends Model<ScheduledMessage> {
   @Column({
     type: DataType.STRING,
     allowNull: false,

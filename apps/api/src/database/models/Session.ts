@@ -4,7 +4,7 @@ import { Table, Column, Model, DataType, PrimaryKey } from 'sequelize-typescript
   tableName: 'Sessions',
   timestamps: false,
 })
-export class Session extends Model {
+export class Session extends Model<Session> {
   @PrimaryKey
   @Column({
     type: DataType.STRING,
