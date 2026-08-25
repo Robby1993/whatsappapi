@@ -7,6 +7,7 @@ import makeWASocket, {
   WAVersion,
 } from '@whiskeysockets/baileys';
 import { Session } from '../database/models/Session';
+import { MessageLog } from '../database/models/MessageLog';
 import { PostgresAuthService } from './postgres-auth.service';
 import { IncomingMessageHandler } from './incoming-message-handler.service';
 
@@ -20,6 +21,8 @@ export class WhatsappService implements OnModuleInit {
   constructor(
     @InjectModel(Session)
     private sessionModel: typeof Session,
+    @InjectModel(MessageLog)
+    private messageLogModel: typeof MessageLog,
     private postgresAuthService: PostgresAuthService,
     private incomingMessageHandler: IncomingMessageHandler,
   ) {}
@@ -89,9 +92,13 @@ export class WhatsappService implements OnModuleInit {
           // Added robust settings
           maxMsgRetryCount: 3,
           getMessage: async (key) => {
-            return {
-              conversation: 'hello'
-            };
+            if (this.messageLogModel) {
+              const msg = await this.messageLogModel.findOne({
+                where: { messageId: key.id }
+              });
+              if (msg) return { conversation: msg.message };
+            }
+            return { conversation: 'MsgPilot automated message' };
           }
         });
 

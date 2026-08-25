@@ -14,13 +14,18 @@ export class CampaignsService {
 
   async create(data: any, userNumber: string) {
     const sender = (data.from || userNumber).toString().replace(/\D/g, '');
-    const { name, message, numbers } = data;
+    const { name, message, numbers, scheduledAt } = data;
+
+    const parsedScheduledAt = scheduledAt && !isNaN(new Date(scheduledAt).getTime())
+      ? new Date(scheduledAt)
+      : null;
 
     const campaign = await this.campaignModel.create({
       name,
       sender,
       message,
       totalContacts: numbers.length,
+      scheduledAt: parsedScheduledAt,
     });
 
     const queued = numbers.map((num: string) => ({
@@ -28,6 +33,7 @@ export class CampaignsService {
       receiver: num,
       message,
       campaignId: campaign.id,
+      scheduledAt: parsedScheduledAt,
     }));
 
     await this.queuedMessageModel.bulkCreate(queued);

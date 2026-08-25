@@ -66,11 +66,11 @@ export class Template extends Model {
   fileName: string;
 
   @Column({
-    type: DataType.BIGINT,
+    type: DataType.DATE,
     allowNull: true,
-    defaultValue: () => Date.now(),
+    defaultValue: DataType.NOW,
   })
-  createdAt: number;
+  createdAt: Date;
 
   @Column({
     type: DataType.DATE,

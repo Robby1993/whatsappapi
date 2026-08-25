@@ -117,11 +117,11 @@ export class UsersService {
     let newValidDays = user.validDays;
     let newCreatedAt = user.createdAt;
 
-    const expiry = Number(user.createdAt) + (user.validDays * 86400000);
+    const expiry = user.createdAt.getTime() + (user.validDays * 86400000);
     if (Date.now() < expiry) {
       newValidDays += plan.days;
     } else {
-      newCreatedAt = Date.now();
+      newCreatedAt = new Date();
       newValidDays = plan.days;
     }
 

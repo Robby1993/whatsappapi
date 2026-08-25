@@ -23,7 +23,8 @@ export default function CampaignsPage() {
   const [formData, setFormData] = useState({
     name: '',
     message: '',
-    numbers: ''
+    numbers: '',
+    scheduledAt: ''
   });
 
   useEffect(() => {
@@ -47,12 +48,14 @@ export default function CampaignsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const numbersList = formData.numbers.split('\n')
+      // Improved parsing: split by newline OR comma
+      const numbersList = formData.numbers
+        .split(/[\n,]/)
         .map(n => n.trim())
-        .filter(n => n.length > 0);
+        .filter(n => n.length > 0 && !isNaN(Number(n.replace(/\D/g, ''))));
 
       if (numbersList.length === 0) {
-        toast.error('Please enter at least one number');
+        toast.error('Please enter valid phone numbers');
         setSubmitting(false);
         return;
       }
@@ -60,12 +63,13 @@ export default function CampaignsPage() {
       await api.post('/campaigns', {
         name: formData.name,
         message: formData.message,
-        numbers: numbersList
+        numbers: numbersList,
+        scheduledAt: formData.scheduledAt || null
       });
 
       toast.success('Campaign created and queued');
       setIsModalOpen(false);
-      setFormData({ name: '', message: '', numbers: '' });
+      setFormData({ name: '', message: '', numbers: '', scheduledAt: '' });
       fetchCampaigns();
     } catch (error) {
       toast.error('Failed to create campaign');
@@ -85,7 +89,17 @@ export default function CampaignsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const formatDate = (date: any) => {
+    if (!date) return 'N/A';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    return d.toLocaleString();
+  };
+
+  const getStatusBadge = (status: string, scheduledAt?: string) => {
+    if (scheduledAt && new Date(scheduledAt) > new Date()) {
+      return <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-bold uppercase flex items-center"><Clock size={12} className="mr-1" /> Scheduled</span>;
+    }
     switch (status) {
       case 'completed': return <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase">Completed</span>;
       case 'processing': return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold uppercase flex items-center"><Loader2 size={12} className="animate-spin mr-1" /> Processing</span>;
@@ -118,11 +132,17 @@ export default function CampaignsPage() {
               <div className="flex-1 space-y-2">
                 <div className="flex items-center space-x-3">
                   <h3 className="text-xl font-bold text-gray-900">{campaign.name}</h3>
-                  {getStatusBadge(campaign.status)}
+                  {getStatusBadge(campaign.status, campaign.scheduledAt)}
                 </div>
                 <p className="text-gray-500 text-sm italic line-clamp-1">"{campaign.message}"</p>
                 <div className="flex items-center space-x-4 text-xs text-gray-400">
-                  <span className="flex items-center"><Clock size={12} className="mr-1" /> {new Date(campaign.createdAt).toLocaleString()}</span>
+                  <span className="flex items-center"><Clock size={12} className="mr-1" /> {formatDate(campaign.createdAt)}</span>
+                  {campaign.scheduledAt && (
+                    <span className="flex items-center text-primary font-medium">
+                      <Clock size={12} className="mr-1" />
+                      Scheduled: {formatDate(campaign.scheduledAt)}
+                    </span>
+                  )}
                   <span className="flex items-center"><Users size={12} className="mr-1" /> {campaign.totalContacts} Contacts</span>
                 </div>
               </div>
@@ -189,11 +209,21 @@ export default function CampaignsPage() {
                     <label className="block text-sm font-medium text-gray-700">Message Content</label>
                     <textarea
                       required
-                      className="mt-1 block w-full px-4 py-2 border rounded-lg h-48 focus:ring-primary focus:border-primary"
+                      className="mt-1 block w-full px-4 py-2 border rounded-lg h-32 focus:ring-primary focus:border-primary"
                       placeholder="Enter your message..."
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Schedule Start (Optional)</label>
+                    <input
+                      type="datetime-local"
+                      className="mt-1 block w-full px-4 py-2 border rounded-lg focus:ring-primary focus:border-primary"
+                      value={formData.scheduledAt}
+                      onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
+                    />
+                    <p className="mt-1 text-xs text-gray-400">Leave empty to start immediately.</p>
                   </div>
                 </div>
 

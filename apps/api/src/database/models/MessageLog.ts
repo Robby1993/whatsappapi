@@ -31,11 +31,17 @@ export class MessageLog extends Model {
   status: string;
 
   @Column({
-    type: DataType.BIGINT,
+    type: DataType.STRING,
     allowNull: true,
-    defaultValue: () => Date.now(),
   })
-  createdAt: number;
+  messageId: string;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+    defaultValue: DataType.NOW,
+  })
+  createdAt: Date;
 
   @Column({
     type: DataType.DATE,

@@ -26,7 +26,7 @@ export class AuthService {
 
     // Check subscription expiry for non-admin users if needed (legacy logic)
     if (user.userType === 'user') {
-        const expiry = Number(user.createdAt) + (user.validDays * 86400000);
+        const expiry = user.createdAt.getTime() + (user.validDays * 86400000);
         if (Date.now() > expiry) {
             await this.tokenModel.destroy({ where: { token: tokenString } });
             throw new ForbiddenException('Subscription expired');

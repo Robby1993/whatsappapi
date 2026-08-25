@@ -48,11 +48,17 @@ export class Campaign extends Model {
   status: string;
 
   @Column({
-    type: DataType.BIGINT,
+    type: DataType.DATE,
     allowNull: true,
-    defaultValue: () => Date.now(),
   })
-  createdAt: number;
+  scheduledAt: Date;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+    defaultValue: DataType.NOW,
+  })
+  createdAt: Date;
 
   @Column({
     type: DataType.DATE,
