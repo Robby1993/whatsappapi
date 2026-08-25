@@ -110,59 +110,39 @@ export class WhatsappController {
     const sock = this.whatsappService.sessions.get(sender);
 
     if (!sock || this.whatsappService.getStatus(sender).status !== 'connected') {
-      return { message: `WhatsApp (${sender}) is disconnected.`, result: null };
+      return { status: false, message: `WhatsApp (${sender}) is disconnected.`, result: null };
     }
 
     const jid = body.phone.replace(/\D/g, '') + '@s.whatsapp.net';
 
-    let messageOptions: any = {};
-    const caption = body.message || '';
+    try {
+      const messageOptions = await this.whatsappService.prepareMessageOptions(body.message, body.mediaUrl, body.mediaType);
 
-    if (body.mediaUrl) {
-      console.log(`Sending media: ${body.mediaType} from ${body.mediaUrl}`);
-      let mediaSource: any;
-      if (body.mediaUrl.includes('/uploads/')) {
-        const filename = body.mediaUrl.split('/uploads/')[1];
-        const filePath = join(process.cwd(), 'uploads', filename);
-        if (fs.existsSync(filePath)) {
-          mediaSource = fs.readFileSync(filePath);
-          console.log(`Loaded local media from: ${filePath}`);
-        } else {
-          console.warn(`Local media file not found: ${filePath}`);
-          mediaSource = { url: body.mediaUrl };
-        }
-      } else {
-        mediaSource = { url: body.mediaUrl };
+      if (!messageOptions) {
+        return { status: false, message: 'Message content or media is required', result: null };
       }
 
-      const type = body.mediaType || 'image';
-      if (type === 'image') messageOptions = { image: mediaSource };
-      else if (type === 'video') messageOptions = { video: mediaSource };
-      else if (type === 'audio') messageOptions = { audio: mediaSource };
-      else if (type === 'document') messageOptions = { document: mediaSource, fileName: 'Document' };
+      console.log(`📤 Sending message to ${jid}...`);
+      const result = await sock.sendMessage(jid, messageOptions);
 
-      if (caption && type !== 'audio') {
-        messageOptions.caption = caption;
-      }
-    } else {
-      messageOptions = { text: caption };
+      await this.messageLogModel.create({
+        sender,
+        receiver: body.phone,
+        message: body.message || '',
+        status: 'sent',
+        mediaUrl: body.mediaUrl,
+        mediaType: body.mediaType,
+        messageId: result?.key?.id
+      });
+
+      const [stat] = await this.statModel.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
+      await stat.increment('totalMessagesSent');
+
+      return { status: true, message: 'Message sent successfully', result };
+    } catch (err) {
+      console.error(`❌ Send Message Error:`, err.message);
+      return { status: false, message: 'Failed to send message: ' + err.message, result: null };
     }
-
-    const result = await sock.sendMessage(jid, messageOptions);
-
-    await this.messageLogModel.create({
-      sender,
-      receiver: body.phone,
-      message: caption,
-      status: 'sent',
-      mediaUrl: body.mediaUrl,
-      mediaType: body.mediaType,
-      messageId: result?.key?.id
-    });
-    const [stat] = await this.statModel.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
-    await stat.increment('totalMessagesSent');
-
-    return { message: 'Message sent successfully', result };
   }
 
   @Post('broadcast')

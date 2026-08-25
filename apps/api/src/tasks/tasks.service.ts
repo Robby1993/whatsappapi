@@ -92,34 +92,11 @@ export class TasksService {
 
           const jid = cleanNumber + '@s.whatsapp.net';
 
-          let messageOptions: any = {};
-          const caption = msg.message || '';
+          const messageOptions = await this.whatsappService.prepareMessageOptions(msg.message, msg.mediaUrl, msg.mediaType);
 
-          if (msg.mediaUrl) {
-            let mediaSource: any;
-            if (msg.mediaUrl.includes('/uploads/')) {
-              const filename = msg.mediaUrl.split('/uploads/')[1];
-              const filePath = join(process.cwd(), 'uploads', filename);
-              if (fs.existsSync(filePath)) {
-                mediaSource = fs.readFileSync(filePath);
-              } else {
-                mediaSource = { url: msg.mediaUrl };
-              }
-            } else {
-              mediaSource = { url: msg.mediaUrl };
-            }
-
-            const type = msg.mediaType || 'image';
-            if (type === 'image') messageOptions = { image: mediaSource };
-            else if (type === 'video') messageOptions = { video: mediaSource };
-            else if (type === 'audio') messageOptions = { audio: mediaSource };
-            else if (type === 'document') messageOptions = { document: mediaSource, fileName: 'Document' };
-
-            if (caption && type !== 'audio') {
-              messageOptions.caption = caption;
-            }
-          } else {
-            messageOptions = { text: caption };
+          if (!messageOptions) {
+            await msg.update({ status: 'failed' });
+            throw new Error('Message content or media is missing');
           }
 
           // Add a small delay between messages in a batch to avoid being banned
@@ -199,34 +176,11 @@ export class TasksService {
         try {
           const jid = msg.receiver.replace(/\D/g, '') + '@s.whatsapp.net';
 
-          let messageOptions: any = {};
-          const caption = msg.message || '';
+          const messageOptions = await this.whatsappService.prepareMessageOptions(msg.message, msg.mediaUrl, msg.mediaType);
 
-          if (msg.mediaUrl) {
-            let mediaSource: any;
-            if (msg.mediaUrl.includes('/uploads/')) {
-              const filename = msg.mediaUrl.split('/uploads/')[1];
-              const filePath = join(process.cwd(), 'uploads', filename);
-              if (fs.existsSync(filePath)) {
-                mediaSource = fs.readFileSync(filePath);
-              } else {
-                mediaSource = { url: msg.mediaUrl };
-              }
-            } else {
-              mediaSource = { url: msg.mediaUrl };
-            }
-
-            const type = msg.mediaType || 'image';
-            if (type === 'image') messageOptions = { image: mediaSource };
-            else if (type === 'video') messageOptions = { video: mediaSource };
-            else if (type === 'audio') messageOptions = { audio: mediaSource };
-            else if (type === 'document') messageOptions = { document: mediaSource, fileName: 'Document' };
-
-            if (caption && type !== 'audio') {
-              messageOptions.caption = caption;
-            }
-          } else {
-            messageOptions = { text: caption };
+          if (!messageOptions) {
+            await msg.update({ status: 'failed' });
+            continue;
           }
 
           const sentMsg = await sock.sendMessage(jid, messageOptions) as any;

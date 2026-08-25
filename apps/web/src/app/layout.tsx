@@ -15,21 +15,33 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { init, user } = useAuthStore();
+  const { init, user, initialized } = useAuthStore();
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
     init();
-  }, []);
+  }, [init]);
 
   const isAuthPage = ['/login', '/register', '/forgot-password'].includes(pathname);
 
   useEffect(() => {
-    if (!user && !isAuthPage) {
+    if (initialized && !user && !isAuthPage) {
       router.push('/login');
     }
-  }, [user, pathname, router]);
+  }, [user, pathname, router, initialized, isAuthPage]);
+
+  if (!initialized) {
+    return (
+      <html lang="en">
+        <body className={inter.className}>
+          <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        </body>
+      </html>
+    );
+  }
 
   return (
     <html lang="en">

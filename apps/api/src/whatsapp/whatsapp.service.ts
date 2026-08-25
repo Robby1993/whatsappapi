@@ -13,6 +13,7 @@ import { IncomingMessageHandler } from './incoming-message-handler.service';
 
 import { join } from 'path';
 import * as fs from 'fs';
+import { proto } from '@whiskeysockets/baileys';
 
 @Injectable()
 export class WhatsappService implements OnModuleInit {
@@ -29,6 +30,56 @@ export class WhatsappService implements OnModuleInit {
     private postgresAuthService: PostgresAuthService,
     private incomingMessageHandler: IncomingMessageHandler,
   ) {}
+
+  /**
+   * Helper to format message options for Baileys
+   */
+  async prepareMessageOptions(message: string, mediaUrl?: string, mediaType?: string) {
+    const caption = message ? String(message).trim() : '';
+
+    if (mediaUrl && mediaUrl.trim() !== '') {
+      console.log(`[WA] Preparing media: ${mediaType} from ${mediaUrl}`);
+      let mediaSource: any;
+      const cleanUrl = mediaUrl.split('?')[0];
+
+      if (cleanUrl.includes('/uploads/')) {
+        const filename = cleanUrl.split('/uploads/')[1];
+        const filePath = join(process.cwd(), 'uploads', filename);
+        if (fs.existsSync(filePath)) {
+          // Using { url: path } is more reliable for large files in Baileys
+          mediaSource = { url: filePath };
+          console.log(`[WA] Using local file path: ${filePath}`);
+        } else {
+          console.warn(`[WA] Local file not found: ${filePath}, using URL`);
+          mediaSource = { url: mediaUrl };
+        }
+      } else {
+        mediaSource = { url: mediaUrl };
+      }
+
+      const type = mediaType || 'image';
+      const options: any = {};
+
+      if (type === 'image') options.image = mediaSource;
+      else if (type === 'video') options.video = mediaSource;
+      else if (type === 'audio') options.audio = mediaSource;
+      else if (type === 'document') {
+        options.document = mediaSource;
+        options.mimetype = 'application/octet-stream';
+        options.fileName = caption.slice(0, 30) || 'Document';
+      }
+
+      if (caption && type !== 'audio') {
+        options.caption = caption;
+      }
+
+      return options;
+    } else if (caption) {
+      return { text: caption };
+    }
+
+    return null;
+  }
 
   async onModuleInit() {
     // Restore active sessions on startup
@@ -200,34 +251,11 @@ export class WhatsappService implements OnModuleInit {
       try {
         const jid = num.replace(/\D/g, '') + '@s.whatsapp.net';
 
-        let messageOptions: any = {};
-        const caption = message || '';
+        const messageOptions = await this.prepareMessageOptions(message, mediaUrl, mediaType);
 
-        if (mediaUrl) {
-          let mediaSource: any;
-          if (mediaUrl.includes('/uploads/')) {
-            const filename = mediaUrl.split('/uploads/')[1];
-            const filePath = join(process.cwd(), 'uploads', filename);
-            if (fs.existsSync(filePath)) {
-              mediaSource = fs.readFileSync(filePath);
-            } else {
-              mediaSource = { url: mediaUrl };
-            }
-          } else {
-            mediaSource = { url: mediaUrl };
-          }
-
-          const type = mediaType || 'image';
-          if (type === 'image') messageOptions = { image: mediaSource };
-          else if (type === 'video') messageOptions = { video: mediaSource };
-          else if (type === 'audio') messageOptions = { audio: mediaSource };
-          else if (type === 'document') messageOptions = { document: mediaSource, fileName: 'Document' };
-
-          if (caption && type !== 'audio') {
-            messageOptions.caption = caption;
-          }
-        } else {
-          messageOptions = { text: caption };
+        if (!messageOptions) {
+          results.push({ number: num, status: 'failed', error: 'Empty message' });
+          continue;
         }
 
         const result = await sock.sendMessage(jid, messageOptions);
@@ -235,7 +263,7 @@ export class WhatsappService implements OnModuleInit {
         await messageLogModel.create({
           sender,
           receiver: num,
-          message: caption,
+          message,
           status: 'sent',
           mediaUrl,
           mediaType,
