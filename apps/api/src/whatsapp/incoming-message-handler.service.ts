@@ -7,10 +7,12 @@ import { ChatSession } from '../database/models/ChatSession';
 import { User } from '../database/models/User';
 import { MessageLog } from '../database/models/MessageLog';
 import { Stat } from '../database/models/Stat';
-import { WhatsappService } from './whatsapp.service';
+import { WhatsappUtils } from './whatsapp-utils';
 
 @Injectable()
 export class IncomingMessageHandler {
+  private readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 Minutes
+
   constructor(
     @InjectModel(ChatFlow)
     private chatFlowModel: typeof ChatFlow,
@@ -24,6 +26,9 @@ export class IncomingMessageHandler {
     private statModel: typeof Stat,
   ) {}
 
+  /**
+   * Main entry point for processing incoming messages.
+   */
   async handle(botPhone: string, sock: any, m: any) {
     try {
       if (!m.messages || m.type !== 'notify') return;
@@ -34,69 +39,48 @@ export class IncomingMessageHandler {
         let msgContent = msg.message;
         if (!msgContent) continue;
 
-        // Unwrap nested messages
-        if (msgContent.ephemeralMessage) msgContent = msgContent.ephemeralMessage.message;
-        if (msgContent.viewOnceMessage) msgContent = msgContent.viewOnceMessage.message;
-        if (msgContent.viewOnceMessageV2) msgContent = msgContent.viewOnceMessageV2.message;
-        if (msgContent.documentWithCaptionMessage) msgContent = msgContent.documentWithCaptionMessage.message;
+        // Unwrap nested messages (ephemeral, view-once, etc.)
+        msgContent = this.unwrapMessage(msgContent);
+        if (!msgContent) continue;
 
         const senderJid = msg.key.remoteJid;
+        const text = this.extractText(msgContent);
 
-        let text =
-          msgContent.conversation ||
-          msgContent.extendedTextMessage?.text ||
-          msgContent.imageMessage?.caption ||
-          msgContent.videoMessage?.caption ||
-          msgContent.buttonsResponseMessage?.selectedDisplayText ||
-          msgContent.listResponseMessage?.singleSelectReply?.title ||
-          msgContent.templateButtonReplyMessage?.selectedDisplayText ||
-          '';
-
-        text = text.trim();
-        if (!text) continue;
-
+        if (!text || text.toLowerCase().includes('waiting for this message')) continue;
         console.log(`📩 ${botPhone} ← ${senderJid}: "${text}"`);
 
-        // 0. Handle Global Commands
-        if (text.toLowerCase() === 'exit' || text.toLowerCase() === 'stop' || text.toLowerCase() === 'restart') {
+        // 0. Handle Global Commands (Exit/Restart)
+        if (this.isGlobalCommand(text)) {
            await this.chatSessionModel.destroy({ where: { senderJid, botPhone } });
            if (text.toLowerCase() === 'restart') {
-              // Just fall through to step 1
+              // Continue to start a new flow
            } else {
-              await sock.sendMessage(senderJid, { text: 'Conversation ended. Send any keyword to start again.' });
+              await sock.sendMessage(senderJid, { text: 'Session ended. You can start again by sending a keyword.' });
               continue;
            }
         }
 
-        // 1. Check for existing active session
+        // 1. Session Management (Check existing & Timeout)
         let session = await this.chatSessionModel.findOne({
-          where: {
-            senderJid,
-            botPhone,
-            currentFlowId: { [Op.ne]: null }
-          }
+          where: { senderJid, botPhone, currentFlowId: { [Op.ne]: null } }
         });
 
         if (session) {
+          const isTimedOut = new Date().getTime() - new Date(session.lastInteraction).getTime() > this.SESSION_TIMEOUT_MS;
+          if (isTimedOut) {
+            console.log(`⏰ Session timed out for ${senderJid}`);
+            await session.destroy();
+            session = null;
+          }
+        }
+
+        // 2. Process existing session or attempt to match new flow
+        if (session) {
           await this.processSession(sock, session, text);
         } else {
-          // 2. Try to match a new flow
-          const flows = await this.chatFlowModel.findAll({
-            where: {
-              isActive: true,
-              [Op.or]: [
-                { botPhone: botPhone },
-                { botPhone: null }
-              ]
-            }
-          });
-
-          const matchedFlow = flows.find(f =>
-            f.triggerKeywords.some(k => text.toLowerCase().includes(k.toLowerCase()))
-          );
-
+          const matchedFlow = await this.findMatchingFlow(botPhone, text);
           if (matchedFlow) {
-            console.log(`🎯 New Flow Triggered: ${matchedFlow.name}`);
+            console.log(`🎯 Flow Triggered: ${matchedFlow.name}`);
             session = await this.chatSessionModel.create({
               senderJid,
               botPhone,
@@ -106,10 +90,13 @@ export class IncomingMessageHandler {
               lastInteraction: new Date()
             });
             await this.executeFlowSteps(sock, matchedFlow, session);
+          } else {
+            // 3. Fallback logic
+            await this.handleFallback(botPhone, sock, senderJid, text);
           }
         }
 
-        // Webhook and Logging (omitted for brevity in logic but kept in original)
+        // Webhook and Logging
         this.handleWebhooks(botPhone, senderJid, text, msgContent, msg.messageTimestamp);
       }
     } catch (err) {
@@ -126,7 +113,6 @@ export class IncomingMessageHandler {
 
     const currentStep = flow.steps[session.currentStepIndex];
 
-    // If we were waiting for input
     if (currentStep?.wait) {
       const context = session.context || {};
       if (currentStep.key) {
@@ -138,13 +124,11 @@ export class IncomingMessageHandler {
       session.lastInteraction = new Date();
       await session.save();
 
-      // Continue to next steps
       await this.executeFlowSteps(sock, flow, session);
     } else {
-        // This shouldn't happen if executeFlowSteps works correctly, but safe-guard
-        session.currentStepIndex += 1;
-        await session.save();
-        await this.executeFlowSteps(sock, flow, session);
+      session.currentStepIndex += 1;
+      await session.save();
+      await this.executeFlowSteps(sock, flow, session);
     }
   }
 
@@ -154,11 +138,9 @@ export class IncomingMessageHandler {
     while (session.currentStepIndex < flow.steps.length) {
       const step = flow.steps[session.currentStepIndex];
 
-      // Send the response
-      await this.sendStepResponse(sock, senderJid, step);
+      await this.sendStepResponse(sock, senderJid, step, session.context);
 
       if (step.wait) {
-        // Stop here and wait for next user message
         console.log(`⏳ Flow ${flow.name}: Waiting at step ${session.currentStepIndex}`);
         break;
       }
@@ -174,26 +156,25 @@ export class IncomingMessageHandler {
     }
   }
 
-  private async sendStepResponse(sock: any, jid: string, step: any) {
-    let response: any = {};
-    const text = step.message || step.responseText || '';
+  private async sendStepResponse(sock: any, jid: string, step: any, context: any) {
+    const rawText = step.message || step.responseText || '';
+    const formattedText = WhatsappUtils.replaceVariables(rawText, context);
+
+    let options: any;
 
     switch (step.type) {
       case 'text':
-        response = { text };
+        options = { text: formattedText };
         break;
       case 'image':
       case 'video':
       case 'audio':
       case 'document':
-        response = {
-          [step.type]: { url: step.mediaUrl },
-          caption: step.type !== 'audio' ? text : undefined,
-        };
+        options = await WhatsappUtils.prepareMessageOptions(formattedText, step.mediaUrl, step.type);
         break;
       case 'buttons':
-        response = {
-          text,
+        options = {
+          text: formattedText,
           footer: step.footer || '',
           buttons: (step.buttons || []).slice(0, 3).map((b: string, i: number) => ({
             buttonId: `btn_${i}`,
@@ -204,9 +185,69 @@ export class IncomingMessageHandler {
         break;
     }
 
-    if (Object.keys(response).length > 0) {
-      await sock.sendMessage(jid, response);
+    if (options) {
+      await sock.sendMessage(jid, options);
     }
+  }
+
+  private async findMatchingFlow(botPhone: string, text: string): Promise<ChatFlow | null> {
+    const flows = await this.chatFlowModel.findAll({
+      where: {
+        isActive: true,
+        [Op.or]: [{ botPhone: botPhone }, { botPhone: null }]
+      }
+    });
+
+    return flows.find(f => WhatsappUtils.matchKeyword(text, f.triggerKeywords)) || null;
+  }
+
+  private async handleFallback(botPhone: string, sock: any, senderJid: string, text: string) {
+    const fallbackFlow = await this.chatFlowModel.findOne({
+      where: {
+        isActive: true,
+        [Op.or]: [{ botPhone: botPhone }, { botPhone: null }],
+        name: { [Op.iLike]: '%fallback%' }
+      }
+    });
+
+    if (fallbackFlow) {
+      const session = await this.chatSessionModel.create({
+        senderJid,
+        botPhone,
+        currentFlowId: fallbackFlow.id,
+        currentStepIndex: 0,
+        context: { originalInput: text },
+        lastInteraction: new Date()
+      });
+      await this.executeFlowSteps(sock, fallbackFlow, session);
+    }
+  }
+
+  private unwrapMessage(msg: any): any {
+    if (msg.ephemeralMessage) return msg.ephemeralMessage.message;
+    if (msg.viewOnceMessage) return msg.viewOnceMessage.message;
+    if (msg.viewOnceMessageV2) return msg.viewOnceMessageV2.message;
+    if (msg.documentWithCaptionMessage) return msg.documentWithCaptionMessage.message;
+    return msg;
+  }
+
+  private extractText(msgContent: any): string {
+    const text = msgContent.conversation ||
+      msgContent.extendedTextMessage?.text ||
+      msgContent.imageMessage?.caption ||
+      msgContent.videoMessage?.caption ||
+      msgContent.buttonsResponseMessage?.selectedDisplayText ||
+      msgContent.listResponseMessage?.singleSelectReply?.title ||
+      msgContent.templateButtonReplyMessage?.selectedDisplayText ||
+      msgContent.templateButtonReplyMessage?.selectedId ||
+      msgContent.interactiveResponseMessage?.body?.text ||
+      '';
+    return text.trim();
+  }
+
+  private isGlobalCommand(text: string): boolean {
+    const cmd = text.toLowerCase().trim();
+    return ['exit', 'stop', 'restart'].includes(cmd);
   }
 
   private async handleWebhooks(phone: string, sender: string, text: string, msgContent: any, timestamp: any) {

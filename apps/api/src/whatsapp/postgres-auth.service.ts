@@ -103,6 +103,7 @@ export class PostgresAuthService {
         },
       },
       saveCreds: async () => {
+        // Ensure we save the latest creds state
         await writeData(creds, 'creds', 'base');
       },
     };

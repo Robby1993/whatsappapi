@@ -19,7 +19,8 @@ import {
   Save,
   ArrowRight,
   MousePointer2,
-  Loader2
+  Loader2,
+  Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -64,9 +65,9 @@ export default function ChatFlowsPage() {
     }
   };
 
-  const addStep = () => {
+  const addStep = (type: string = 'text') => {
     const newStep: FlowStep = {
-      type: 'text',
+      type: type,
       message: '',
       mediaUrl: '',
       wait: false,
@@ -169,12 +170,14 @@ export default function ChatFlowsPage() {
     setIsModalOpen(true);
   };
 
-  const getStepIcon = (type: string) => {
+  const getStepIcon = (type: string, size: number = 16) => {
     switch (type) {
-      case 'text': return <Type size={14} />;
-      case 'image': return <ImageIcon size={14} />;
-      case 'video': return <PlaySquare size={14} />;
-      default: return <MessageCircle size={14} />;
+      case 'text': return <Type size={size} className="text-primary" />;
+      case 'image': return <ImageIcon size={size} className="text-purple-500" />;
+      case 'video': return <PlaySquare size={size} className="text-amber-500" />;
+      case 'audio': return <MessageCircle size={size} className="text-rose-500" />;
+      case 'document': return <ListIcon size={size} className="text-blue-500" />;
+      default: return <MessageCircle size={size} className="text-gray-400" />;
     }
   };
 
@@ -318,7 +321,7 @@ export default function ChatFlowsPage() {
                        <input
                          type="text"
                          className="flex-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg outline-none text-xs font-bold"
-                         placeholder="Type keyword..."
+                         placeholder="Type keyword (e.g. price)..."
                          value={keywordInput}
                          onChange={(e) => setKeywordInput(e.target.value)}
                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addKeyword())}
@@ -328,11 +331,24 @@ export default function ChatFlowsPage() {
                     <div className="flex flex-wrap gap-1.5">
                        {formData.triggerKeywords.map(kw => (
                          <span key={kw} className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-lg text-[11px] font-bold group border border-blue-100">
-                           {kw}
+                           #{kw}
                            <X size={12} className="cursor-pointer hover:text-rose-500" onClick={() => removeKeyword(kw)} />
                          </span>
                        ))}
+                       {formData.triggerKeywords.length === 0 && <p className="text-[10px] text-gray-400 italic">No keywords added yet.</p>}
                     </div>
+                  </div>
+
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                     <h4 className="text-[10px] font-black text-amber-900 uppercase tracking-widest mb-2">Variables Found</h4>
+                     <div className="flex flex-wrap gap-1.5">
+                        {Array.from(new Set(formData.steps.filter(s => s.wait && s.key).map(s => s.key))).map(key => (
+                          <span key={key} className="text-[10px] bg-white border border-amber-200 text-amber-700 px-2 py-0.5 rounded font-mono font-bold">
+                             {`{{${key}}}`}
+                          </span>
+                        ))}
+                        {formData.steps.filter(s => s.wait && s.key).length === 0 && <p className="text-[9px] text-amber-600 font-medium">Capture inputs to use variables.</p>}
+                     </div>
                   </div>
 
                   <div className="pt-6 border-t">
@@ -354,80 +370,91 @@ export default function ChatFlowsPage() {
                 {/* Right: Flow Steps */}
                 <div className="lg:col-span-2 space-y-6">
                    <div className="flex items-center justify-between px-1">
-                      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Conversation Path Steps</label>
-                      <button type="button" onClick={addStep} className="text-primary font-black text-[11px] uppercase flex items-center gap-1 hover:underline">
-                         <Plus size={14} /> Add Step
-                      </button>
+                      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Conversation Path</label>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => addStep('text')} className="bg-primary/10 text-primary p-2 rounded-lg hover:bg-primary/20 transition-all shadow-sm" title="Add Text">
+                           <Type size={16} />
+                        </button>
+                        <button type="button" onClick={() => addStep('image')} className="bg-purple-50 text-purple-600 p-2 rounded-lg hover:bg-purple-100 transition-all shadow-sm" title="Add Image">
+                           <ImageIcon size={16} />
+                        </button>
+                        <button type="button" onClick={() => addStep('video')} className="bg-amber-50 text-amber-600 p-2 rounded-lg hover:bg-amber-100 transition-all shadow-sm" title="Add Video">
+                           <PlaySquare size={16} />
+                        </button>
+                        <button type="button" onClick={() => addStep('document')} className="bg-blue-50 text-blue-600 p-2 rounded-lg hover:bg-blue-100 transition-all shadow-sm" title="Add Document">
+                           <ListIcon size={16} />
+                        </button>
+                      </div>
                    </div>
 
-                   <div className="space-y-4">
+                   <div className="space-y-0 relative before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-0.5 before:bg-gray-100">
                       {formData.steps.map((step, index) => (
-                        <div key={index} className="bg-gray-50/50 rounded-2xl border border-gray-100 p-5 relative group/step animate-in slide-in-from-bottom-2 duration-300">
-                           <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-3">
-                                 <div className="w-6 h-6 bg-gray-900 text-white rounded-full flex items-center justify-center text-[10px] font-black">
-                                   {index + 1}
-                                 </div>
-                                 <select
-                                   className="bg-white border-0 rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tight outline-none focus:ring-2 focus:ring-primary/20"
-                                   value={step.type}
-                                   onChange={(e) => updateStep(index, 'type', e.target.value)}
-                                 >
-                                    <option value="text">Text Message</option>
-                                    <option value="image">Send Image</option>
-                                    <option value="video">Send Video</option>
-                                    <option value="audio">Send Audio</option>
-                                    <option value="document">Send Doc</option>
-                                 </select>
-                              </div>
-                              <button onClick={() => removeStep(index)} className="text-rose-400 hover:text-rose-600 transition-colors">
-                                 <Trash2 size={16} />
-                              </button>
+                        <div key={index} className="pl-12 pb-8 relative group/step animate-in slide-in-from-bottom-2 duration-300 last:pb-0">
+                           {/* Step Connector Node */}
+                           <div className="absolute left-0 top-0 w-10 h-10 bg-white border-2 border-gray-100 rounded-2xl flex items-center justify-center z-10 group-hover/step:border-primary transition-colors">
+                              {getStepIcon(step.type)}
                            </div>
 
-                           <div className="grid grid-cols-1 gap-4">
-                              <textarea
-                                className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none resize-none"
-                                rows={2}
-                                placeholder={step.type === 'text' ? "What should the bot say?" : "Add a caption (optional)"}
-                                value={step.message}
-                                onChange={(e) => updateStep(index, 'message', e.target.value)}
-                              />
+                           <div className={`rounded-2xl border transition-all p-5 relative ${step.wait ? 'bg-amber-50/30 border-amber-100' : 'bg-gray-50/50 border-gray-100'}`}>
+                              <div className="flex items-center justify-between mb-4">
+                                 <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Step {index + 1}</span>
+                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
+                                      step.type === 'text' ? 'bg-primary/10 text-primary' : 'bg-purple-100 text-purple-700'
+                                    }`}>{step.type}</span>
+                                 </div>
+                                 <button onClick={() => removeStep(index)} className="p-1 text-gray-400 hover:text-rose-500 transition-colors">
+                                    <Trash2 size={14} />
+                                 </button>
+                              </div>
 
-                              {step.type !== 'text' && (
-                                <input
-                                  type="text"
-                                  className="w-full px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none"
-                                  placeholder="Enter Media URL (https://...)"
-                                  value={step.mediaUrl || ''}
-                                  onChange={(e) => updateStep(index, 'mediaUrl', e.target.value)}
-                                />
-                              )}
+                              <div className="grid grid-cols-1 gap-3">
+                                 <textarea
+                                   className="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none resize-none shadow-sm"
+                                   rows={2}
+                                   placeholder={step.type === 'text' ? "Enter message content..." : "Media caption (optional)"}
+                                   value={step.message}
+                                   onChange={(e) => updateStep(index, 'message', e.target.value)}
+                                 />
 
-                              <div className="flex items-center justify-between pt-2">
-                                 <div className="flex items-center gap-6">
-                                    <label className="flex items-center gap-2 cursor-pointer group">
-                                       <div
-                                         onClick={() => updateStep(index, 'wait', !step.wait)}
-                                         className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${step.wait ? 'bg-primary border-primary' : 'bg-white border-gray-200 group-hover:border-primary'}`}
-                                       >
-                                          {step.wait && <X size={10} className="text-white" strokeWidth={5} />}
-                                       </div>
-                                       <span className="text-[10px] font-black text-gray-500 uppercase tracking-tight">Wait for user input</span>
-                                    </label>
+                                 {step.type !== 'text' && (
+                                   <div className="relative">
+                                      <input
+                                        type="text"
+                                        className="w-full pl-9 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none shadow-sm"
+                                        placeholder="Enter Media URL..."
+                                        value={step.mediaUrl || ''}
+                                        onChange={(e) => updateStep(index, 'mediaUrl', e.target.value)}
+                                      />
+                                      <ImageIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+                                   </div>
+                                 )}
 
-                                    {step.wait && (
-                                      <div className="flex items-center gap-2 animate-in fade-in zoom-in duration-300">
-                                         <span className="text-[10px] font-black text-gray-300 uppercase italic">Save to key:</span>
-                                         <input
-                                           type="text"
-                                           className="w-20 px-2 py-1 bg-white border border-gray-100 rounded text-[10px] font-bold outline-none uppercase"
-                                           placeholder="e.g. name"
-                                           value={step.key || ''}
-                                           onChange={(e) => updateStep(index, 'key', e.target.value)}
-                                         />
-                                      </div>
-                                    )}
+                                 <div className="flex items-center justify-between pt-2">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                       <label className="flex items-center gap-2 cursor-pointer select-none">
+                                          <div
+                                            onClick={() => updateStep(index, 'wait', !step.wait)}
+                                            className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${step.wait ? 'bg-amber-500 border-amber-500' : 'bg-white border-gray-200'}`}
+                                          >
+                                             {step.wait && <Check size={10} className="text-white" strokeWidth={5} />}
+                                          </div>
+                                          <span className={`text-[10px] font-black uppercase tracking-tight ${step.wait ? 'text-amber-600' : 'text-gray-400'}`}>Wait for input</span>
+                                       </label>
+
+                                       {step.wait && (
+                                         <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-300 bg-amber-100/50 px-3 py-1 rounded-lg border border-amber-200">
+                                            <span className="text-[9px] font-black text-amber-700 uppercase">Save Answer to:</span>
+                                            <input
+                                              type="text"
+                                              className="w-24 px-2 py-1 bg-white border border-amber-200 rounded text-[10px] font-bold outline-none uppercase text-amber-800 placeholder:text-amber-300"
+                                              placeholder="e.g. name"
+                                              value={step.key || ''}
+                                              onChange={(e) => updateStep(index, 'key', e.target.value)}
+                                            />
+                                         </div>
+                                       )}
+                                    </div>
                                  </div>
                               </div>
                            </div>
@@ -435,9 +462,9 @@ export default function ChatFlowsPage() {
                       ))}
 
                       {formData.steps.length === 0 && (
-                        <div onClick={addStep} className="py-12 border-2 border-dashed border-gray-100 rounded-3xl flex flex-col items-center justify-center text-gray-300 cursor-pointer hover:bg-gray-50 transition-all hover:border-primary/30">
+                        <div onClick={() => addStep('text')} className="ml-12 py-12 border-2 border-dashed border-gray-100 rounded-3xl flex flex-col items-center justify-center text-gray-300 cursor-pointer hover:bg-gray-50 transition-all hover:border-primary/30">
                            <Plus size={32} />
-                           <p className="text-xs font-black uppercase tracking-widest mt-2">Start Building the path</p>
+                           <p className="text-xs font-black uppercase tracking-widest mt-2">Add your first step</p>
                         </div>
                       )}
                    </div>

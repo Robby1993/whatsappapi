@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Query, UseGuards, Req, HttpStatus, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
+import { WhatsappUtils } from './whatsapp-utils';
 import { TokenAuthGuard } from '../auth/guards/token-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { InjectModel } from '@nestjs/sequelize';
@@ -116,7 +117,7 @@ export class WhatsappController {
     const jid = body.phone.replace(/\D/g, '') + '@s.whatsapp.net';
 
     try {
-      const messageOptions = await this.whatsappService.prepareMessageOptions(body.message, body.mediaUrl, body.mediaType);
+      const messageOptions = await WhatsappUtils.prepareMessageOptions(body.message, body.mediaUrl, body.mediaType);
 
       if (!messageOptions) {
         return { status: false, message: 'Message content or media is required', result: null };

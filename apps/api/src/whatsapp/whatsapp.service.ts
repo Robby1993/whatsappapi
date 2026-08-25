@@ -10,6 +10,7 @@ import { Session } from '../database/models/Session';
 import { MessageLog } from '../database/models/MessageLog';
 import { PostgresAuthService } from './postgres-auth.service';
 import { IncomingMessageHandler } from './incoming-message-handler.service';
+import { WhatsappUtils } from './whatsapp-utils';
 
 import { join } from 'path';
 import * as fs from 'fs';
@@ -30,56 +31,6 @@ export class WhatsappService implements OnModuleInit {
     private postgresAuthService: PostgresAuthService,
     private incomingMessageHandler: IncomingMessageHandler,
   ) {}
-
-  /**
-   * Helper to format message options for Baileys
-   */
-  async prepareMessageOptions(message: string, mediaUrl?: string, mediaType?: string) {
-    const caption = message ? String(message).trim() : '';
-
-    if (mediaUrl && mediaUrl.trim() !== '') {
-      console.log(`[WA] Preparing media: ${mediaType} from ${mediaUrl}`);
-      let mediaSource: any;
-      const cleanUrl = mediaUrl.split('?')[0];
-
-      if (cleanUrl.includes('/uploads/')) {
-        const filename = cleanUrl.split('/uploads/')[1];
-        const filePath = join(process.cwd(), 'uploads', filename);
-        if (fs.existsSync(filePath)) {
-          // Using { url: path } is more reliable for large files in Baileys
-          mediaSource = { url: filePath };
-          console.log(`[WA] Using local file path: ${filePath}`);
-        } else {
-          console.warn(`[WA] Local file not found: ${filePath}, using URL`);
-          mediaSource = { url: mediaUrl };
-        }
-      } else {
-        mediaSource = { url: mediaUrl };
-      }
-
-      const type = mediaType || 'image';
-      const options: any = {};
-
-      if (type === 'image') options.image = mediaSource;
-      else if (type === 'video') options.video = mediaSource;
-      else if (type === 'audio') options.audio = mediaSource;
-      else if (type === 'document') {
-        options.document = mediaSource;
-        options.mimetype = 'application/octet-stream';
-        options.fileName = caption.slice(0, 30) || 'Document';
-      }
-
-      if (caption && type !== 'audio') {
-        options.caption = caption;
-      }
-
-      return options;
-    } else if (caption) {
-      return { text: caption };
-    }
-
-    return null;
-  }
 
   async onModuleInit() {
     // Restore active sessions on startup
@@ -143,17 +94,42 @@ export class WhatsappService implements OnModuleInit {
           generateHighQualityLinkPreview: true,
           retryRequestDelayMs: 5000,
           markOnlineOnConnect: true,
-          // Added robust settings
-          maxMsgRetryCount: 3,
+          // Enhanced retry logic for LID/PN decryption issues
+          maxMsgRetryCount: 5,
           getMessage: async (key) => {
-            if (this.messageLogModel) {
-              const msg = await this.messageLogModel.findOne({
-                where: { messageId: key.id }
-              });
-              if (msg) return { conversation: msg.message };
+            try {
+              if (this.messageLogModel) {
+                const msg = await this.messageLogModel.findOne({
+                  where: { messageId: key.id }
+                });
+                if (msg) return { conversation: msg.message };
+              }
+              return { conversation: 'Message will be delivered shortly...' };
+            } catch (e) {
+              return { conversation: 'Processing message...' };
             }
-            return { conversation: 'MsgPilot automated message' };
-          }
+          },
+          patchMessageBeforeSending: (message) => {
+             const requiresPatch = !!(
+               message.buttonsMessage ||
+               message.templateMessage ||
+               message.listMessage
+             );
+             if (requiresPatch) {
+               return {
+                 viewOnceMessage: {
+                   message: {
+                     messageContextInfo: {
+                       deviceListMetadata: {},
+                       deviceListMetadataVersion: 2,
+                     },
+                     ...message,
+                   },
+                 },
+               };
+             }
+             return message;
+          },
         });
 
         this.sessions.set(cleanPhone, sock);
@@ -251,7 +227,7 @@ export class WhatsappService implements OnModuleInit {
       try {
         const jid = num.replace(/\D/g, '') + '@s.whatsapp.net';
 
-        const messageOptions = await this.prepareMessageOptions(message, mediaUrl, mediaType);
+        const messageOptions = await WhatsappUtils.prepareMessageOptions(message, mediaUrl, mediaType);
 
         if (!messageOptions) {
           results.push({ number: num, status: 'failed', error: 'Empty message' });

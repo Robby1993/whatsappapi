@@ -3,6 +3,7 @@ import { Cron, Interval } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/sequelize';
 import { Op } from 'sequelize';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { WhatsappUtils } from '../whatsapp/whatsapp-utils';
 import { QueuedMessage } from '../database/models/QueuedMessage';
 import { ScheduledMessage } from '../database/models/ScheduledMessage';
 import { MessageLog } from '../database/models/MessageLog';
@@ -92,7 +93,7 @@ export class TasksService {
 
           const jid = cleanNumber + '@s.whatsapp.net';
 
-          const messageOptions = await this.whatsappService.prepareMessageOptions(msg.message, msg.mediaUrl, msg.mediaType);
+          const messageOptions = await WhatsappUtils.prepareMessageOptions(msg.message, msg.mediaUrl, msg.mediaType);
 
           if (!messageOptions) {
             await msg.update({ status: 'failed' });
@@ -176,7 +177,7 @@ export class TasksService {
         try {
           const jid = msg.receiver.replace(/\D/g, '') + '@s.whatsapp.net';
 
-          const messageOptions = await this.whatsappService.prepareMessageOptions(msg.message, msg.mediaUrl, msg.mediaType);
+          const messageOptions = await WhatsappUtils.prepareMessageOptions(msg.message, msg.mediaUrl, msg.mediaType);
 
           if (!messageOptions) {
             await msg.update({ status: 'failed' });
