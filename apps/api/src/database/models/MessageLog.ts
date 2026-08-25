@@ -26,6 +26,18 @@ export class MessageLog extends Model {
 
   @Column({
     type: DataType.STRING,
+    allowNull: true,
+  })
+  mediaUrl: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  mediaType: string;
+
+  @Column({
+    type: DataType.STRING,
     defaultValue: 'sent',
   })
   status: string;

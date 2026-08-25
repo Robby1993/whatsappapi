@@ -25,6 +25,18 @@ export class QueuedMessage extends Model {
   message: string;
 
   @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  mediaUrl: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  mediaType: string;
+
+  @Column({
     type: DataType.ENUM('pending', 'processing', 'sent', 'failed'),
     defaultValue: 'pending',
   })

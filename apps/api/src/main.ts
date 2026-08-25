@@ -4,11 +4,20 @@ import { AppModule } from './app.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import * as dotenv from 'dotenv';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import * as fs from 'fs';
 
 dotenv.config();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Ensure uploads directory exists
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
 
   // Global Safety Net to prevent library-internal errors from crashing the process
   process.on('uncaughtException', (err) => {
@@ -22,6 +31,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.enableCors();
+
+  // Serve static files from the uploads directory
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads',
+  });
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,

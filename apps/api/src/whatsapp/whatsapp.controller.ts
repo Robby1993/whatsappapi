@@ -1,10 +1,14 @@
-import { Controller, Post, Get, Body, Query, UseGuards, Req, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, UseGuards, Req, HttpStatus, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { TokenAuthGuard } from '../auth/guards/token-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { InjectModel } from '@nestjs/sequelize';
 import { MessageLog } from '../database/models/MessageLog';
 import { Stat } from '../database/models/Stat';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import * as fs from 'fs';
 
 @Controller('whatsapp')
 @UseGuards(TokenAuthGuard)
@@ -16,6 +20,28 @@ export class WhatsappController {
     @InjectModel(Stat)
     private statModel: typeof Stat,
   ) {}
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: diskStorage({
+      destination: './uploads',
+      filename: (req, file, cb) => {
+        const randomName = Array(32).fill(null).map(() => (Math.round(Math.random() * 16)).toString(16)).join('');
+        cb(null, `${randomName}${extname(file.originalname)}`);
+      },
+    }),
+  }))
+  async uploadFile(@UploadedFile() file: any) {
+    const apiUrl = process.env.API_URL || 'http://localhost:5001';
+    const url = `${apiUrl}/uploads/${file.filename}`;
+    return {
+      message: 'File uploaded successfully',
+      result: {
+        url,
+        type: file.mimetype.split('/')[0] === 'application' ? 'document' : file.mimetype.split('/')[0]
+      }
+    };
+  }
 
   @Post('connect-pair')
   async connectPair(@Body('phone') phone: string, @Req() req: any) {
@@ -79,7 +105,7 @@ export class WhatsappController {
   }
 
   @Post('send-message')
-  async sendMessage(@Body() body: { phone: string; message: string; from?: string }, @Req() req: any) {
+  async sendMessage(@Body() body: { phone: string; message: string; from?: string; mediaUrl?: string; mediaType?: string }, @Req() req: any) {
     const sender = (body.from || req.userNumber).toString().replace(/\D/g, '');
     const sock = this.whatsappService.sessions.get(sender);
 
@@ -88,9 +114,51 @@ export class WhatsappController {
     }
 
     const jid = body.phone.replace(/\D/g, '') + '@s.whatsapp.net';
-    const result = await sock.sendMessage(jid, { text: body.message });
 
-    await this.messageLogModel.create({ sender, receiver: body.phone, message: body.message, status: 'sent' });
+    let messageOptions: any = {};
+    const caption = body.message || '';
+
+    if (body.mediaUrl) {
+      console.log(`Sending media: ${body.mediaType} from ${body.mediaUrl}`);
+      let mediaSource: any;
+      if (body.mediaUrl.includes('/uploads/')) {
+        const filename = body.mediaUrl.split('/uploads/')[1];
+        const filePath = join(process.cwd(), 'uploads', filename);
+        if (fs.existsSync(filePath)) {
+          mediaSource = fs.readFileSync(filePath);
+          console.log(`Loaded local media from: ${filePath}`);
+        } else {
+          console.warn(`Local media file not found: ${filePath}`);
+          mediaSource = { url: body.mediaUrl };
+        }
+      } else {
+        mediaSource = { url: body.mediaUrl };
+      }
+
+      const type = body.mediaType || 'image';
+      if (type === 'image') messageOptions = { image: mediaSource };
+      else if (type === 'video') messageOptions = { video: mediaSource };
+      else if (type === 'audio') messageOptions = { audio: mediaSource };
+      else if (type === 'document') messageOptions = { document: mediaSource, fileName: 'Document' };
+
+      if (caption && type !== 'audio') {
+        messageOptions.caption = caption;
+      }
+    } else {
+      messageOptions = { text: caption };
+    }
+
+    const result = await sock.sendMessage(jid, messageOptions);
+
+    await this.messageLogModel.create({
+      sender,
+      receiver: body.phone,
+      message: caption,
+      status: 'sent',
+      mediaUrl: body.mediaUrl,
+      mediaType: body.mediaType,
+      messageId: result?.key?.id
+    });
     const [stat] = await this.statModel.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
     await stat.increment('totalMessagesSent');
 
@@ -98,7 +166,7 @@ export class WhatsappController {
   }
 
   @Post('broadcast')
-  async broadcast(@Body() body: { numbers: string[]; message: string; from?: string }, @Req() req: any) {
+  async broadcast(@Body() body: { numbers: string[]; message: string; from?: string; mediaUrl?: string; mediaType?: string }, @Req() req: any) {
     const sender = (body.from || req.userNumber).toString().replace(/\D/g, '');
     try {
       const results = await this.whatsappService.broadcast(
@@ -106,7 +174,9 @@ export class WhatsappController {
         body.numbers,
         body.message,
         this.messageLogModel,
-        this.statModel
+        this.statModel,
+        body.mediaUrl,
+        body.mediaType
       );
       return { message: 'Broadcast processed', result: { total: body.numbers.length, results } };
     } catch (err) {

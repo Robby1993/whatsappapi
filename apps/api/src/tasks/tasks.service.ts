@@ -8,6 +8,8 @@ import { ScheduledMessage } from '../database/models/ScheduledMessage';
 import { MessageLog } from '../database/models/MessageLog';
 import { Stat } from '../database/models/Stat';
 import { Campaign } from '../database/models/Campaign';
+import { join } from 'path';
+import * as fs from 'fs';
 
 @Injectable()
 export class TasksService {
@@ -90,12 +92,42 @@ export class TasksService {
 
           const jid = cleanNumber + '@s.whatsapp.net';
 
+          let messageOptions: any = {};
+          const caption = msg.message || '';
+
+          if (msg.mediaUrl) {
+            let mediaSource: any;
+            if (msg.mediaUrl.includes('/uploads/')) {
+              const filename = msg.mediaUrl.split('/uploads/')[1];
+              const filePath = join(process.cwd(), 'uploads', filename);
+              if (fs.existsSync(filePath)) {
+                mediaSource = fs.readFileSync(filePath);
+              } else {
+                mediaSource = { url: msg.mediaUrl };
+              }
+            } else {
+              mediaSource = { url: msg.mediaUrl };
+            }
+
+            const type = msg.mediaType || 'image';
+            if (type === 'image') messageOptions = { image: mediaSource };
+            else if (type === 'video') messageOptions = { video: mediaSource };
+            else if (type === 'audio') messageOptions = { audio: mediaSource };
+            else if (type === 'document') messageOptions = { document: mediaSource, fileName: 'Document' };
+
+            if (caption && type !== 'audio') {
+              messageOptions.caption = caption;
+            }
+          } else {
+            messageOptions = { text: caption };
+          }
+
           // Add a small delay between messages in a batch to avoid being banned
           await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
 
           // Set a 30 second timeout for sending the message
           const sentMsg = await Promise.race([
-            sock.sendMessage(jid, { text: msg.message }),
+            sock.sendMessage(jid, messageOptions),
             new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Send message timeout')), 30000)
             )
@@ -120,6 +152,8 @@ export class TasksService {
             status: 'sent',
             campaignId: msg.campaignId,
             messageId: sentMsg?.key?.id,
+            mediaUrl: msg.mediaUrl,
+            mediaType: msg.mediaType,
           });
 
           const [stat] = await this.statModel.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
@@ -164,7 +198,38 @@ export class TasksService {
 
         try {
           const jid = msg.receiver.replace(/\D/g, '') + '@s.whatsapp.net';
-          await sock.sendMessage(jid, { text: msg.message });
+
+          let messageOptions: any = {};
+          const caption = msg.message || '';
+
+          if (msg.mediaUrl) {
+            let mediaSource: any;
+            if (msg.mediaUrl.includes('/uploads/')) {
+              const filename = msg.mediaUrl.split('/uploads/')[1];
+              const filePath = join(process.cwd(), 'uploads', filename);
+              if (fs.existsSync(filePath)) {
+                mediaSource = fs.readFileSync(filePath);
+              } else {
+                mediaSource = { url: msg.mediaUrl };
+              }
+            } else {
+              mediaSource = { url: msg.mediaUrl };
+            }
+
+            const type = msg.mediaType || 'image';
+            if (type === 'image') messageOptions = { image: mediaSource };
+            else if (type === 'video') messageOptions = { video: mediaSource };
+            else if (type === 'audio') messageOptions = { audio: mediaSource };
+            else if (type === 'document') messageOptions = { document: mediaSource, fileName: 'Document' };
+
+            if (caption && type !== 'audio') {
+              messageOptions.caption = caption;
+            }
+          } else {
+            messageOptions = { text: caption };
+          }
+
+          const sentMsg = await sock.sendMessage(jid, messageOptions) as any;
 
           await msg.update({ status: 'sent' });
 
@@ -173,6 +238,9 @@ export class TasksService {
             receiver: msg.receiver,
             message: msg.message,
             status: 'sent',
+            messageId: sentMsg?.key?.id,
+            mediaUrl: msg.mediaUrl,
+            mediaType: msg.mediaType,
           });
 
           const [stat] = await this.statModel.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });

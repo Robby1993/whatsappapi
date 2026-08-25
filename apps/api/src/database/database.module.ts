@@ -19,7 +19,12 @@ import { Plan } from './models/Plan';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const dbUrl = configService.get<string>('DATABASE_URL');
-        const isRender = dbUrl && dbUrl.includes('render.com');
+
+        if (!dbUrl) {
+          throw new Error('DATABASE_URL environment variable is not defined');
+        }
+
+        const isRender = dbUrl.includes('render.com');
 
         return {
           dialect: 'postgres',

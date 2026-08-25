@@ -11,6 +11,9 @@ import { MessageLog } from '../database/models/MessageLog';
 import { PostgresAuthService } from './postgres-auth.service';
 import { IncomingMessageHandler } from './incoming-message-handler.service';
 
+import { join } from 'path';
+import * as fs from 'fs';
+
 @Injectable()
 export class WhatsappService implements OnModuleInit {
   public sessions = new Map<string, any>();
@@ -186,7 +189,7 @@ export class WhatsappService implements OnModuleInit {
     return this.sessionStatus.get(cleanPhone) || { status: 'not_connected' };
   }
 
-  async broadcast(sender: string, numbers: string[], message: string, messageLogModel: any, statModel: any) {
+  async broadcast(sender: string, numbers: string[], message: string, messageLogModel: any, statModel: any, mediaUrl?: string, mediaType?: string) {
     const sock = this.sessions.get(sender);
     if (!sock || this.getStatus(sender).status !== 'connected') {
       throw new Error(`WhatsApp (${sender}) is disconnected.`);
@@ -196,14 +199,53 @@ export class WhatsappService implements OnModuleInit {
     for (const num of numbers) {
       try {
         const jid = num.replace(/\D/g, '') + '@s.whatsapp.net';
-        await sock.sendMessage(jid, { text: message });
 
-        await messageLogModel.create({ sender, receiver: num, message, status: 'sent' });
+        let messageOptions: any = {};
+        const caption = message || '';
+
+        if (mediaUrl) {
+          let mediaSource: any;
+          if (mediaUrl.includes('/uploads/')) {
+            const filename = mediaUrl.split('/uploads/')[1];
+            const filePath = join(process.cwd(), 'uploads', filename);
+            if (fs.existsSync(filePath)) {
+              mediaSource = fs.readFileSync(filePath);
+            } else {
+              mediaSource = { url: mediaUrl };
+            }
+          } else {
+            mediaSource = { url: mediaUrl };
+          }
+
+          const type = mediaType || 'image';
+          if (type === 'image') messageOptions = { image: mediaSource };
+          else if (type === 'video') messageOptions = { video: mediaSource };
+          else if (type === 'audio') messageOptions = { audio: mediaSource };
+          else if (type === 'document') messageOptions = { document: mediaSource, fileName: 'Document' };
+
+          if (caption && type !== 'audio') {
+            messageOptions.caption = caption;
+          }
+        } else {
+          messageOptions = { text: caption };
+        }
+
+        const result = await sock.sendMessage(jid, messageOptions);
+
+        await messageLogModel.create({
+          sender,
+          receiver: num,
+          message: caption,
+          status: 'sent',
+          mediaUrl,
+          mediaType,
+          messageId: result?.key?.id
+        });
         const [stat] = await statModel.findOrCreate({ where: { id: 1 }, defaults: { totalMessagesSent: 0 } });
         await stat.increment('totalMessagesSent');
 
         results.push({ number: num, status: 'sent' });
-        await new Promise(r => setTimeout(r, 1000)); // Throttling
+        await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000)); // Throttling
       } catch (e) {
         results.push({ number: num, status: 'failed', error: e.message });
       }

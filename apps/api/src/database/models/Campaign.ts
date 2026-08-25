@@ -24,6 +24,18 @@ export class Campaign extends Model {
   message: string;
 
   @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  mediaUrl: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  mediaType: string;
+
+  @Column({
     type: DataType.INTEGER,
     defaultValue: 0,
   })

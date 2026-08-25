@@ -14,7 +14,7 @@ export class CampaignsService {
 
   async create(data: any, userNumber: string) {
     const sender = (data.from || userNumber).toString().replace(/\D/g, '');
-    const { name, message, numbers, scheduledAt } = data;
+    const { name, message, numbers, scheduledAt, mediaUrl, mediaType } = data;
 
     const parsedScheduledAt = scheduledAt && !isNaN(new Date(scheduledAt).getTime())
       ? new Date(scheduledAt)
@@ -24,6 +24,8 @@ export class CampaignsService {
       name,
       sender,
       message,
+      mediaUrl,
+      mediaType,
       totalContacts: numbers.length,
       scheduledAt: parsedScheduledAt,
     });
@@ -32,6 +34,8 @@ export class CampaignsService {
       sender,
       receiver: num,
       message,
+      mediaUrl,
+      mediaType,
       campaignId: campaign.id,
       scheduledAt: parsedScheduledAt,
     }));

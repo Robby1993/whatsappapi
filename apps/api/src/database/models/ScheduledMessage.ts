@@ -24,6 +24,18 @@ export class ScheduledMessage extends Model {
   message: string;
 
   @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  mediaUrl: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  mediaType: string;
+
+  @Column({
     type: DataType.BIGINT,
     allowNull: false,
   })
