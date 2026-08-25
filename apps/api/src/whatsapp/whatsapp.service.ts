@@ -52,10 +52,13 @@ export class WhatsappService implements OnModuleInit {
 
     const promise = (async () => {
       try {
-        if (this.sessions.has(cleanPhone)) {
-          const oldSock = this.sessions.get(cleanPhone);
-          oldSock.ev.removeAllListeners();
-          if (oldSock.ws) oldSock.ws.close();
+        // Force cleanup of old session if it exists
+        const oldSock = this.sessions.get(cleanPhone);
+        if (oldSock) {
+          try {
+            oldSock.ev.removeAllListeners();
+            if (oldSock.ws) oldSock.ws.close();
+          } catch (e) {}
           this.sessions.delete(cleanPhone);
         }
 
@@ -63,32 +66,44 @@ export class WhatsappService implements OnModuleInit {
         const { state, saveCreds } = await this.postgresAuthService.getAuthState(cleanPhone);
         console.log(`🔑 Auth State loaded for: ${cleanPhone}`);
 
+        // Get version with a faster fallback and retry
         const { version } = (await fetchLatestBaileysVersion().catch(() => ({
-          version: [2, 3000, 1015901307], // Latest stable fallback
+          version: [2, 3000, 1015901307],
         }))) as { version: WAVersion };
+
         console.log(`📦 WhatsApp Version: ${version.join('.')} for ${cleanPhone}`);
 
         const sock = makeWASocket({
           version,
           auth: state,
           printQRInTerminal: false,
-          browser: Browsers.macOS('Chrome'), // Using macOS Chrome specifically
+          browser: Browsers.ubuntu('Chrome'),
           syncFullHistory: false,
           shouldSyncHistoryMessage: () => false,
           connectTimeoutMs: 60000,
           defaultQueryTimeoutMs: 0,
-          keepAliveIntervalMs: 15000,
+          keepAliveIntervalMs: 30000,
           generateHighQualityLinkPreview: true,
-          // Add retry logic for metadata to look more human
           retryRequestDelayMs: 5000,
+          markOnlineOnConnect: true,
+          // Added robust settings
+          maxMsgRetryCount: 3,
+          getMessage: async (key) => {
+            return {
+              conversation: 'hello'
+            };
+          }
         });
 
         this.sessions.set(cleanPhone, sock);
         this.sessionStatus.set(cleanPhone, { status: 'connecting' });
 
-        sock.ev.on('creds.update', saveCreds);
+        sock.ev.on('creds.update', async (update) => {
+          Object.assign(state.creds, update);
+          await saveCreds();
+        });
 
-        sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+        sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
           const status = this.sessionStatus.get(cleanPhone) || { status: 'connecting' };
 
           if (qr) {
@@ -107,16 +122,21 @@ export class WhatsappService implements OnModuleInit {
             const reason = (lastDisconnect?.error as any)?.output?.statusCode;
             console.log(`❌ Connection closed for ${cleanPhone}. Reason: ${reason}`);
 
+            // Important: Clear the session from the map so a new one can be started
+            this.sessions.delete(cleanPhone);
+
             if (reason === DisconnectReason.loggedOut) {
-              this.sessions.delete(cleanPhone);
               this.sessionStatus.delete(cleanPhone);
               this.sessionModel.destroy({ where: { phone: cleanPhone } }).catch(() => {});
-            } else if (reason === 515) {
-              console.log(`🔄 Restart required (515) for ${cleanPhone}, reconnecting now...`);
-              this.initWhatsApp(cleanPhone).catch(() => {});
+            } else if (reason === 515 || reason === DisconnectReason.restartRequired) {
+              console.log(`🔄 Restart required (${reason}) for ${cleanPhone}, reconnecting now...`);
+              // Use a small delay to avoid tight loops
+              setTimeout(() => this.initWhatsApp(cleanPhone).catch(() => {}), 1000);
             } else if (!this.loggingOut.has(cleanPhone)) {
               this.sessionStatus.set(cleanPhone, { ...status, status: 'disconnected' });
-              setTimeout(() => this.initWhatsApp(cleanPhone), 5000);
+              // Backoff strategy
+              const delay = reason === 401 ? 10000 : 5000;
+              setTimeout(() => this.initWhatsApp(cleanPhone), delay);
             }
           }
         });

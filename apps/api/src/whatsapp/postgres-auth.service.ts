@@ -5,6 +5,8 @@ import { Session } from '../database/models/Session';
 
 @Injectable()
 export class PostgresAuthService {
+  private writeQueues = new Map<string, Promise<void>>();
+
   constructor(
     @InjectModel(Session)
     private sessionModel: typeof Session,
@@ -12,21 +14,29 @@ export class PostgresAuthService {
 
   async getAuthState(phone: string): Promise<{ state: AuthenticationState; saveCreds: () => Promise<void> }> {
     const writeData = async (data: any, type: string, id: string) => {
-      try {
-        const sData = JSON.stringify(data, BufferJSON.replacer);
+      const queueKey = `${phone}:${type}:${id}`;
+      const previousTask = this.writeQueues.get(queueKey) || Promise.resolve();
 
-        // Use findOrCreate + update for maximum compatibility and to avoid "Validation error" during critical pairing
-        const [session, created] = await this.sessionModel.findOrCreate({
-          where: { phone, dataType: type, dataId: id },
-          defaults: { data: sData }
-        });
+      const newTask = (async () => {
+        try {
+          await previousTask;
+          const sData = JSON.stringify(data, BufferJSON.replacer);
 
-        if (!created) {
-          await session.update({ data: sData });
+          const [session, created] = await this.sessionModel.findOrCreate({
+            where: { phone, dataType: type, dataId: id },
+            defaults: { data: sData }
+          });
+
+          if (!created && session.data !== sData) {
+            await session.update({ data: sData });
+          }
+        } catch (err) {
+          console.error(`Error writing auth data (${type}/${id}):`, err.message);
         }
-      } catch (err) {
-        console.error(`Error writing auth data (${type}/${id}):`, err.message);
-      }
+      })();
+
+      this.writeQueues.set(queueKey, newTask);
+      await newTask;
     };
 
     const readData = async (type: string, id: string) => {
